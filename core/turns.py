@@ -32,7 +32,6 @@ class TurnCollector:
                 if current_assistant_turn:
                     # if a user message arrives and it's currently still
                     # the assistant's turn, that means we finalize it, and move onto a new turn!
-                    current_assistant_turn["last_message_index"] = index-1
                     turns.append(current_assistant_turn)
                     current_assistant_turn = None
                 
@@ -50,6 +49,10 @@ class TurnCollector:
                         "first_message_index": index,
                         "messages": []
                     }
+
+                # update the last message index.. since this is a for loop,
+                # by the time we reach the last message, this will be set to the last message index
+                current_assistant_turn["last_message_index"] = index
                     
                 current_assistant_turn["messages"].append(msg)
 
