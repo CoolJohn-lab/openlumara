@@ -25,9 +25,14 @@
             {% include 'svg/keyboard.svg' %}
         </button>
 
+        <!--
+        storage editor was too much to quickly remake from scratch for this release.
+        so, TODO: make a good openluamra storage editor... preferably in the core instead of the webui. then just hook the webui into it
+
         <button class="btn" title="Storage Editor" x-show="!$store.ui.isMobile" x-cloak>
             {% include 'svg/folder.svg' %}
         </button>
+        -->
         <button class="btn" title="Clear chat" @click="
             if (!confirm('Are you sure you want to clear this chat?')) { return }
 
