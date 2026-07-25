@@ -80,6 +80,8 @@ CHAT_STORE = {
 
         this.turnHistory = result.turn_history;
 
+        await Alpine.store('ui').scrollToBottom();
+
         /*
          * since the AI can move chats to different categories,
          * the category might have changed
@@ -171,7 +173,6 @@ CHAT_STORE = {
     async startEdit(turnIndex) {
         const turn = this.turnHistory[turnIndex];
         const msg = turn.messages[turn.messages.length-1]; // last message in the turn
-        console.log(msg);
 
         this.editingMessageIndex = msg.index;
         this.editContent = msg.content;

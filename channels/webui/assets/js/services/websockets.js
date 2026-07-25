@@ -165,6 +165,8 @@ async function handleWebSocketMessage(data) {
             console.log(data.content);
             await AudioManager.play('response_start');
             await Alpine.store('notifications').send(data.content.content);
+
+            await Alpine.store('ui').forceScrollToBottom();
             break;
 
         case "log":
