@@ -1,5 +1,6 @@
 import core
-import textwrap
+import os
+import datetime
 import asyncio
 import shlex
 
@@ -11,6 +12,7 @@ BUILTIN_COMMANDS = {
         "prompt <module name>": "show system prompt for that module",
         "history": "show full chat history",
         "context": "show full context being sent to AI",
+        "export": "export the current chat history to a file",
         "status": "show status info",
         "config": "Explore, view, and set config settings",
         "restart": "restarts the server",
@@ -360,7 +362,6 @@ class Commands:
                     result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
 
                 return result
-
             case "chat":
                 """load chat using its ID"""
                 if not args:
@@ -614,6 +615,24 @@ class Commands:
 
                 enabled_str = "\n".join(enabled)
                 return f"== modules with active prompts ==\n{enabled_str}"
+            case "export":
+                export_str = await self.channel.context.chat.export()
+
+                export_dir = core.get_data_path(os.path.join("chat_exports", self.channel.name))
+                file_name = datetime.datetime.now().strftime("%Y%m%d")+"_"+self.channel.context.chat.get('title')
+
+                # remove a bunch of junk from the filename, as well as replace spaces
+                file_name = file_name.strip('/').replace(" ", "_").replace("..", "")
+                file_name = file_name[:50] # shorten the name
+
+                file_path = core.get_data_path(os.path.join("chat_exports", self.channel.name, f"{file_name}.txt"))
+                os.makedirs(export_dir, exist_ok=True)
+
+                with open(file_path, 'w', encoding="utf-8") as f:
+                    f.write(export_str)
+
+                return f"chat exported to {file_path}"
+
             case "restart":
                 await self.channel.manager.restart()
                 return "restarting server"

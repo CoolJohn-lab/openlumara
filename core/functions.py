@@ -107,7 +107,7 @@ def validate_path_string(path: str) -> str:
 
     # Check for traversal and null bytes
     if ".." in decoded or "\x00" in decoded:
-        raise ValueError("Path traversal is not allowed")
+        raise ValueError(f"Path traversal is not allowed ({path})")
 
     return decoded
 

@@ -5,7 +5,7 @@
     }
 }">
     <span class="text" 
-          x-text="`Tokens: ${$store.chat.currentTokenUsage} / ${$store.system.data.max_context}`">
+          x-text="`Tokens: ${$store.chat.currentTokenUsage.toLocaleString()} / ${$store.system.data.max_context.toLocaleString()}`">
     </span>
     <div id="token-usage-container" class="container">
         <div class="bg">

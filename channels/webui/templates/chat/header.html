@@ -18,7 +18,7 @@
         <button class="btn" id="settings-btn" title="Settings (Ctrl+S)" @click="await $store.ui.openModal('settings')">
             {% include 'svg/gear.svg' %}
         </button>
-        <button class="btn" title="Export chat">
+        <button class="btn" title="Export chat" @click="$store.chat.export()">
             {% include 'svg/download.svg' %}
         </button>
         <button class="btn shortcuts-btn" title="Keyboard shortcuts (?)" x-show="!$store.ui.isMobile" x-cloak>
@@ -31,7 +31,7 @@
         <button class="btn" title="Clear chat" @click="
             await simpleSocketSend({
                 'type': 'user_message',
-                'content': {'role': 'user', 'content': '/clear'}
+                'content': '/clear'
             })
         ">
             {% include 'svg/trash.svg' %}

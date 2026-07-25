@@ -267,6 +267,7 @@ async function handleWebSocketMessage(data) {
 
             // and finally, sync back up with the backend
             await chat.reloadChat();
+            await chat.reloadChats();
 
             break;
     }

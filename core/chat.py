@@ -146,7 +146,7 @@ class Chat:
     # ------------------
     # Chat Manipulation
     # ------------------
-    async def new(self, category: str = "general", title: str = "", metadata = None):
+    async def new(self, category: str = "general", title: str = "New chat", metadata = None):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
 
@@ -262,6 +262,67 @@ class Chat:
         #     self.channel.log("core", f"failure while sending prompt warmup to API: {core.detail_error(e)}")
 
         return True
+
+    async def export(self):
+        """exports the current chat to a file"""
+
+        if self.current is None:
+            raise Exception("No chat is currently loaded!")
+
+        turns = await self.channel.turncollector.group_history(await self.messages.get())
+
+        turn_export = []
+        for turn in turns:
+            turn_lines = []
+            turn_lines.append(f"--- {turn.get('role')} ---")
+
+            # extract content
+            items = []
+            for message in turn.get("messages"):
+                role = message.get("role")
+                content = message.get("content")
+                toolcalls = message.get("tool_calls")
+
+                # handle content
+                if content and role != "tool" and not toolcalls:
+                    if isinstance(content, str):
+                        items.append(('content', content.strip()))
+                    elif isinstance(content, list):
+                        for part in content:
+                            if part.get("type") == "text":
+                                items.append(('content', part.get('text').strip()))
+                
+                # handle toolcalls
+                if toolcalls:
+                    for toolcall in toolcalls:
+                        items.append(('tool', self.channel.tc_manager.display_call(toolcall)))
+
+            # group items by type
+            blocks = []
+            current_block_type = None
+            current_block_items = []
+
+            for item_type, item_content in items:
+                if item_type != current_block_type:
+                    # Type changed, save previous block
+                    if current_block_items:
+                        blocks.append(current_block_items)
+                    current_block_type = item_type
+                    current_block_items = []
+                current_block_items.append(item_content)
+            
+            # don't forget the last block
+            if current_block_items:
+                blocks.append(current_block_items)
+
+            # join blocks with double newlines, items within blocks with single newlines
+            formatted_blocks = ["\n".join(block) for block in blocks]
+            turn_lines.append("\n\n".join(formatted_blocks))
+
+            turn_export.append("\n".join(turn_lines))
+
+        return "\n\n".join(turn_export)
+
 
     def get(self, key = None, default = None):
         if self.current is None:

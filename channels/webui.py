@@ -430,6 +430,11 @@ async def create_fastapi(channel):
         chat["turn_history"] = await channel.group_history()
         return api_result(chat)
 
+    @app.get("/api/chat/export")
+    async def chat_export():
+        """Gives you the chat history as a human-readable string, which you can save to a file or do whatever else with"""
+        return api_result(await channel.context.chat.export())
+
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
         """Returns a list of all chats"""

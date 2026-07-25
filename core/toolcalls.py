@@ -12,10 +12,7 @@ class ToolcallManager:
         """format a toolcalling response into a nice string for display to the user"""
 
         try:
-            if hasattr(tool_data, 'function'):
-                func_name = getattr(tool_data.function, 'name', 'unknown')
-                raw_args = getattr(tool_data.function, 'arguments', '{}')
-            elif isinstance(tool_data, dict) and 'function' in tool_data:
+            if 'function' in tool_data:
                 func_name = tool_data['function'].get('name', 'unknown')
                 raw_args = tool_data['function'].get('arguments', '{}')
             else:

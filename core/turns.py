@@ -14,7 +14,7 @@ class TurnCollector:
     now available in the core for any channel to use :)
     """
 
-    def group_history(self, history):
+    async def group_history(self, history):
         """
         Groups all finalized messages from history into turns.
         Returns a list of turn objects.

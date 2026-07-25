@@ -78,7 +78,6 @@ class Channel:
 
     async def init(self):
         """async class constructor. gets called by manager._load_channels()"""
-        core.log(self.name, "autoloading chat")
         await self.context.chat.autoload()
 
     # ------------------
@@ -841,4 +840,4 @@ class Channel:
         takes a list of messages and turns it into turns that are identical to the ones shown by get_turns_stream()
         for displaying message history in the same grouped turns format
         """
-        return self.turncollector.group_history(await self.context.chat.messages.get())
+        return await self.turncollector.group_history(await self.context.chat.messages.get())

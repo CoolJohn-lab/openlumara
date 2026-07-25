@@ -50,8 +50,8 @@ class Messages:
         # make a copy so we don't modify the original reference
         new_message = message.copy()
 
-        if not self.chat.get("title"):
-            # auto-set title
+        if len(self.data) <= 1 and message.get("role") == "user" and not cmd:
+            # auto-set title (if the message was not a command)
             msg_content = self.channel._extract_content(new_message)
             if isinstance(msg_content, str):
                 await self.chat.set("title", msg_content[:100]+".." if len(msg_content) > 100 else msg_content)
@@ -120,9 +120,9 @@ class Messages:
         await self.save()
         return True
 
-        async def clear(self):
-            self.data.clear()
-            return True
+    async def clear(self):
+        self.data.clear()
+        return True
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):
         """gets the latest message with the specified role"""

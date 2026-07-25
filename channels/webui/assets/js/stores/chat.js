@@ -211,6 +211,39 @@ CHAT_STORE = {
     },
 
     /* ----------------------
+     * chat export
+     * ----------------------- */
+    async export() {
+        try {
+            // Get the export string from the backend
+            const exportStr = await simpleApiFetch('/api/chat/export');
+            
+            if (!exportStr) {
+                throw new Error('Export returned empty data');
+            }
+
+            // Get chat title for filename
+            const chatTitle = this.chat?.title || 'chat-export';
+            const safeTitle = chatTitle.replace(/[\/\\:*?"<>|]/g, '_');
+            const filename = `${safeTitle}.txt`;
+
+            // Create blob and trigger download
+            const blob = new Blob([exportStr], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export failed:', err);
+            // Optional: show a toast/notification to the user
+        }
+    },
+
+    /* ----------------------
      * chat-specific getters
      * ----------------------- */
     get promptprogress() {
