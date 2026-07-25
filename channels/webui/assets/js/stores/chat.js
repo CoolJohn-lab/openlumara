@@ -112,6 +112,9 @@ CHAT_STORE = {
 
 
     async send(text) {
+        Alpine.store("stream").state = "sending";
+
+        // handle any files the user may have attached
         const uploadStore = Alpine.store("upload");
 
         let files = null;
@@ -127,15 +130,17 @@ CHAT_STORE = {
 
         AudioManager.play("send_message");
 
+        /*
+         * send the message to the backend - websockets will take it from here
+         * the backend will now emit user_message_added to confirm the user message was received by the backend,
+         * which the frontend (services/websockets.js) receives and then triggers reloadChat() on this chat store
+         * so that the new user message shows up
+         */
         const success = await simpleSocketSend({
             type: "user_message",
             content: text,
             files: files
         });
-
-        if (success) {
-            Alpine.store("stream").state = "sending";
-        }
 
         uploadStore.clear();
     },
@@ -151,9 +156,12 @@ CHAT_STORE = {
     },
 
     async regenerateMessage(index) {
-        await simpleSocketSend({
-            "type": "message_regenerate",
-            "index": index
+        Alpine.store('stream').userMsg = null;
+        Alpine.nextTick(async () => {
+            await simpleSocketSend({
+                "type": "message_regenerate",
+                "index": index
+            });
         });
     },
 

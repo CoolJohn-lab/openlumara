@@ -104,17 +104,14 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "user_message_added":
-            // show the message, with a special "pending" status
-            stream.userMsg = data.message;
-            stream.userMsgPending = true;
+            // reload chat from backend so that the new user message shows up
+            await chat.reloadChat();
 
             // force scroll to bottom
             await Alpine.store('ui').forceScrollToBottom();
             break;
 
         case "user_message_confirmed":
-            // aaand now we remove the pending status
-            stream.userMsgPending = false;
             stream.state = 'received';
             break;
 
@@ -233,7 +230,6 @@ async function handleWebSocketMessage(data) {
             chat.turnHistory = [];
             await stream.clear();
             await chat.reloadChat();
-            console.log("forcing sync");
             break;
 
         case "chat_switched":

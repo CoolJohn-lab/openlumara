@@ -107,24 +107,25 @@ class Messages:
 
     async def delete_from(self, index: int):
         """
-        Deletes all messages below a certain index
+        Deletes the message at the given index and all messages after it
         """
         if index >= len(self.data):
             raise Exception("Invalid message index")
 
-        # return all messages up to and including the target message
-        new_messages = self.data[:index+1]
+        # return all messages up to (but not including) the target message
+        new_messages = self.data[:index]
+        print(new_messages)
 
         self.data.load(new_messages)
         await self.save()
         return True
 
-    async def clear(self):
-        self.data.clear()
-        return True
+        async def clear(self):
+            self.data.clear()
+            return True
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):
-        # get last message by that role
+        """gets the latest message with the specified role"""
 
         # if we have a "cutoff index",
         # it means we have to search backwards
@@ -134,19 +135,23 @@ class Messages:
         # because we can target the last user message
         # before the cutoff index
 
+        if not self.data:
+            return -1
+
         if len(self.data) == 1:
-            # just return the first index
-            return 0
+            # just return 0 if there is only one message... but only if the role matches the request
+            if self.data[0].get("role") == role:
+                return 0
+            return -1
 
         if cutoff_index is not None:
-            start_index = cutoff_index
+            # clamp it
+            start_index = min(cutoff_index, len(self.data) - 1)
         else:
-            # Start at the very end
-            start_index = len(self.data)
+            start_index = len(self.data) - 1
 
         for index in range(start_index, -1, -1):
-            message = self.data[index]
-            if message.get("role") == role:
+            if self.data[index].get("role") == role:
                 return index
 
         return -1

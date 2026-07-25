@@ -121,29 +121,6 @@ class Context:
                         pass
                     # Non-string, non-list content is left as-is (don't silently drop messages)
 
-            # enforce correct turn order
-            # system -> user -> assistant -> user -> assistant -> ...
-            # assistant -> tool -> assistant is VALID (tool use flow)
-            # assistant -> assistant is INVALID (needs spacer)
-            if messages:
-                enforced_messages = []
-                for msg in messages:
-                    if enforced_messages:
-                        last_role = enforced_messages[-1].get("role")
-                        current_role = msg.get("role")
-
-                        # Two consecutive assistant messages need a spacer user message,
-                        # BUT only if there's no tool message in between.
-                        # assistant -> tool -> assistant is valid (tool use flow).
-                        if last_role == "assistant" and current_role == "assistant":
-                            enforced_messages.append({"role": "user", "content": " "})
-                        # Two consecutive user messages also violate turn order
-                        elif last_role == "user" and current_role == "user":
-                            enforced_messages.append({"role": "assistant", "content": " "})
-
-                    enforced_messages.append(msg)
-
-                messages = enforced_messages
 
         end_msg = []
         if end_prompt:
@@ -163,6 +140,38 @@ class Context:
         # so that we can cleanly send it to the API
         approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
         messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
+
+        # enforce correct turn order
+        # system -> user -> assistant -> user -> assistant -> ...
+        # assistant -> tool -> assistant is VALID (tool use flow)
+        # assistant -> assistant is INVALID (needs spacer)
+        if messages:
+            enforced_messages = []
+            for i, msg in enumerate(messages):
+                if enforced_messages:
+                    last_role = enforced_messages[-1].get("role")
+                    current_role = msg.get("role")
+
+                    # Check for assistan->assistant where the first assistant had tool_calls
+                    # This suggests a tool message was removed, so the sequence might be valid
+                    if last_role == "assistant" and current_role == "assistant":
+                        prev_msg = enforced_messages[-1]
+                        if prev_msg.get("tool_calls"):
+                            # The previous assistant had tool_calls, so a tool message might have been removed.
+                            pass  # Don't insert spacer - the tool message was probably removed
+                        else:
+                            # No tool_calls on previous assistant, so this is a genuine assistant→assistant violation
+                            enforced_messages.append({"role": "user", "content": " "})
+                    elif last_role == "user" and current_role == "user":
+                        enforced_messages.append({"role": "assistant", "content": " "})
+                    elif last_role == "tool" and current_role == "user":
+                        enforced_messages.append({"role": "assistant", "content": " "})
+                    elif last_role == "user" and current_role == "tool":
+                        enforced_messages.append({"role": "assistant", "content": " "})
+
+                enforced_messages.append(msg)
+
+            messages = enforced_messages
 
         # 2. Build and Trim Context
         # We combine them to check the total token count

@@ -796,8 +796,7 @@ async def create_fastapi(channel):
                             if index < 0:
                                 return False
 
-                            # delete_from deletes all messages AFTER the target, so we need to do index-1
-                            await channel.context.chat.messages.delete_from(index-1)
+                            await channel.context.chat.messages.delete_from(index)
                             await ws_mgr.broadcast({
                                 "type": "sync"
                             })
@@ -806,22 +805,22 @@ async def create_fastapi(channel):
 
                             if index is not None and channel:
                                 last_user_message_index = await channel.context.chat.messages.get_last_message_with_role("user", cutoff_index=index)
+
+                                if last_user_message_index == -1:
+                                    await ws_mgr.broadcast({
+                                        "type": "error",
+                                        "error": "Could not regenerate message (no preceding user message found)"
+                                    })
+                                    return
+
                                 user_message = await channel.context.chat.messages.get(last_user_message_index)
 
                                 # delete_from deletes all messages AFTER the target, so we need to do index-1
-                                await channel.context.chat.messages.delete_from(last_user_message_index-1)
+                                # max(0, index) clamps it so that it never goes below 0
+                                await channel.context.chat.messages.delete_from(max(0, last_user_message_index))
 
-                                if user_message:
-                                    await ws_mgr.broadcast({
-                                        "type": "sync",
-                                    })
-                                    print(user_message)
-                                    await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message.get("content"))
-                                else:
-                                    await ws_mgr.broadcast({
-                                        "type": "error",
-                                        "error": "Could not regenerate message (no preceding user message found)."
-                                    })
+                                await ws_mgr.broadcast({"type": "sync"})
+                                await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message.get("content"))
                         case _:
                             channel.log(channel.name, f"Unknown websocket command received: {msg_type}")
 
