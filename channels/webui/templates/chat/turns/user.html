@@ -1,4 +1,4 @@
-<template x-if="$store.chat.editingMessageIndex !== turn.first_message_index">
+<template x-if="message && $store.chat.editingMessageIndex !== turn.first_message_index">
     <div class="fullwidth">
         <template x-if="Array.isArray(message.content)">
             <div class="multimodal-content">
@@ -19,10 +19,6 @@
 
         <template x-if="typeof message.content === 'string'">
             <div x-html="renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
-        </template>
-
-        <template x-if="message.index === $store.stream.pendingMessageId">
-            <span class="status">Sending..</span>
         </template>
     </div>
 </template>
