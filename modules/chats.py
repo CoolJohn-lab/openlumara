@@ -22,7 +22,7 @@ class Chats(core.module.Module):
         return f"Available categories to categorise chat into: {', '.join(cats)}" if len(cats) > 1 else None
 
     async def _get_categories(self):
-        cats = [c for c in await self.channel.context.chat.get_categories() if len(c.split(":")) == 1 and c]
+        cats = [c for c in self.channel.context.chat.get_categories() if len(c.split(":")) == 1 and c]
         return cats
 
     async def get_categories(self):
