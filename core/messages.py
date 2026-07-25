@@ -50,7 +50,7 @@ class Messages:
         # make a copy so we don't modify the original reference
         new_message = message.copy()
 
-        if len(self.data) <= 1 and message.get("role") == "user" and not cmd:
+        if (not self.chat.get("title") or self.chat.get("title") == "New chat") and message.get("role") == "user" and not cmd:
             # auto-set title (if the message was not a command)
             msg_content = self.channel._extract_content(new_message)
             if isinstance(msg_content, str):
