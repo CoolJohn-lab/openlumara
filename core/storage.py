@@ -117,7 +117,7 @@ class StorageList(list):
 
     def load(self, data=None):
         """load content from file or data argument"""
-        if data:
+        if data is not None:
             self.clear()
             self.extend(data)
             return self
@@ -371,7 +371,7 @@ class StorageDict(dict):
 
     def load(self, data=None):
         """load content from file or data argument"""
-        if data:
+        if data is not None:
             self.clear()
             self.update(data)
             return True
