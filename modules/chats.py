@@ -33,10 +33,13 @@ class Chats(core.module.Module):
         return self.result(cats)
 
     # AI tool version
-    async def organize(self, new_name: str, category: str, tags: list = []):
+    async def organize(self, new_name: str, category: str, tags: list = None):
         """Lets you rename, categorize, and tag the current chat. If the chat fits within an existing category (defined in your system prompt), use that one. If a fitting category does not exist, create a new one."""
         if not new_name:
             return self.result("name must not be blank", False)
+
+        if tags is None:
+            tags = []
 
         await self.channel.context.chat.set("title", new_name)
         await self.channel.context.chat.set("category", category)

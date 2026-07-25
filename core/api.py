@@ -434,7 +434,7 @@ class APIClient():
 
         # return errors if applicable
         if isinstance(response, APIError):
-            return str(response)
+            return response
 
         try:
             result = await self._recv(response)

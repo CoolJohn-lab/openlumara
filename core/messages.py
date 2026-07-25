@@ -6,6 +6,10 @@ class Messages:
         self.channel = channel
         self.chat = chat
 
+        chat_id = self.chat.get("id")
+        if not isinstance(chat_id, str):
+            raise Exception("Could not load chat messages: Chat ID must be a string")
+
         self.path = os.path.join(self.chat.path, "history", self.chat.get("id"))
         self.data = core.storage.StorageList(self.path, "json")
 
@@ -93,11 +97,8 @@ class Messages:
         self.data[index] = message
         await self.save()
 
-    async def delete(self, index: int = None):
+    async def delete(self, index: int):
         """delete message from current chat"""
-        if index is None:
-            index = -1
-
         self.data.pop(index)
         index = len(self.data) - 1
         await self.save()
@@ -109,7 +110,6 @@ class Messages:
         Deletes all messages below a certain index
         """
         if index >= len(self.data):
-            print("uhoh")
             raise Exception("Invalid message index")
 
         # return all messages up to and including the target message

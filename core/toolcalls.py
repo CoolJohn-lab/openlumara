@@ -2,7 +2,7 @@ import core
 import json
 import json_repair
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
+import copy
 
 class ToolcallManager:
     def __init__(self, channel):
@@ -74,7 +74,7 @@ class ToolcallManager:
         tool_calls = token.get("tool_calls")
 
         if tool_calls:
-            repaired_tool_calls = self._repair_tool_calls(tool_calls)
+            repaired_tool_calls = self._repair_tool_calls(copy.deepcopy(tool_calls))
             repaired_token = token.copy()
             repaired_token["tool_calls"] = repaired_tool_calls
             return repaired_token

@@ -91,7 +91,8 @@ class Memory(core.module.Module):
         if tags:
             self._mem[index]["tags"] = tags
 
-        return self.result(self._mem.save())
+        self._mem.save()
+        return self.result(f"memory {id} edited")
 
     async def delete(self, id: str):
         """Deletes a memory. Use to prune irrelevant/redundant info. DANGEROUS: Ensure memory is truly obsolete before deleting."""
@@ -103,7 +104,8 @@ class Memory(core.module.Module):
         self._mem_deleted.save()
 
         self._mem.pop(index)
-        return self.result(self._mem.save())
+        self._mem.save()
+        return self.result(f"memory {id} deleted")
 
     async def pin(self, id: str):
         """Pins a memory to the top of your active context window. Use for critical identity, user preferences, or high-priority goals."""
@@ -112,7 +114,8 @@ class Memory(core.module.Module):
             return self.result("memory with that ID not found!")
 
         self._mem[index]["pinned"] = True
-        return self.result(self._mem.save())
+        self._mem.save()
+        return self.result(f"memory {id} pinned")
 
     async def unpin(self, id: str):
         """Unpins a memory to manage cognitive load. Use when a pinned memory is no longer high priority."""
@@ -121,7 +124,8 @@ class Memory(core.module.Module):
             return self.result("memory with that ID not found!")
 
         self._mem[index]["pinned"] = False
-        return self.result(self._mem.save())
+        self._mem.save()
+        return self.result(f"memory {id} unpinned")
 
     async def search(self, query: str, search_in_content: bool = False):
         """Searches memories by query. Use when you need to recall past info but don't know the exact ID."""

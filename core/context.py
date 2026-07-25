@@ -1,5 +1,4 @@
 import core
-import copy
 import tiktoken
 
 class Context:
@@ -53,7 +52,8 @@ class Context:
         messages = []
         if history:
             # Get history from the chat (the full, untrimmed version)
-            messages = copy.deepcopy(await self.chat.messages.get())
+            # create a shallow copy of it by doing a list comprehension
+            messages = [dict(msg) for msg in await self.chat.messages.get()]
 
             # we need to support chat summarization without losing the user-facing end of chat history
             # so that we can cut context without actually losing our logs..
@@ -259,9 +259,11 @@ class Context:
         Counts token usage locally using tiktoken (with fallback)
         """
         num_tokens = 0
-        _messages = messages or await self.get(system_prompt=True, end_prompt=True)
 
-        if not _messages or isinstance(_messages, core.api.APIError):
+        if messages is None:
+            messages = await self.get(system_prompt=True, end_prompt=True)
+
+        if isinstance(messages, core.api.APIError):
             return 0
 
         # only set the tiktoken encoder if the model changed
@@ -282,7 +284,7 @@ class Context:
                 self.channel.log_error("[TIKTOKEN] Falling back on character-based token counting.", e)
                 pass
 
-        for message in _messages:
+        for message in messages:
             # Conservative token counting:
             # - 3 tokens for message overhead (OpenAI format: <im_start>role\ncontent<im_end>\n)
             num_tokens += 3

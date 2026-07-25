@@ -420,7 +420,7 @@ class Channel:
                 cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
             except Exception as e:
                 self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
-                await self.context.chat.messages.add({"role": "user", "content": user_message, "is_cmd": True})
+                # no need to add a message to context here, as process_input() already does that
                 return {"type": "error", "content": str(core.detail_error(e))}
 
             if cmd_response:
@@ -479,7 +479,16 @@ class Channel:
                 except Exception as e:
                     self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
 
-    def _build_final_assistant_message(self, final_content = [], final_reasoning = []):
+    def _build_final_assistant_message(self, final_content = None, final_reasoning = None):
+        # python has a bug where, if you pass a default value in the function definition,
+        # all calls to the function then share the reference to that value,
+        # which, well, pollutes future calls...
+
+        if final_content is None:
+            final_content = []
+        if final_reasoning is None:
+            final_reasoning = []
+
         assistant_message = {
             "role": "assistant",
             "content": "".join(final_content)
@@ -577,7 +586,7 @@ class Channel:
         if self.context.using_api_token_data:
             # if using API token count
             user_msg_tokens = await self.context.count_tokens([{"role": "user", "content": user_message}])
-            user_message_token_estimation = self.context.chat.get("token_usage")+user_msg_tokens
+            user_message_token_estimation = self.context.chat.get("token_usage", 0)+user_msg_tokens
 
             # add to existing API token count
             await self.context.chat.set("token_usage", user_message_token_estimation)

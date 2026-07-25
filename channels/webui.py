@@ -401,11 +401,11 @@ async def create_fastapi(channel):
 
     # --- chats
     # -- GET
-    @app.get("/api/chat/load/{id}")
-    async def chat_load(id: str, request: fastapi.Request):
+    @app.get("/api/chat/load/{chat_id}")
+    async def chat_load(chat_id: str, request: fastapi.Request):
         """Loads a specific chat by its id"""
         try:
-            success = await channel.context.chat.load(id)
+            success = await channel.context.chat.load(chat_id)
         except Exception as e:
             return api_result(f"error while loading chat: {core.detail_error(e)}", success=False)
 
@@ -416,7 +416,7 @@ async def create_fastapi(channel):
             return api_result(chat, success=True)
 
         # broadcast the switch to any connected clients
-        await channel.websocket_manager.broadcast({"type": "chat_switched", "id": id})
+        await channel.websocket_manager.broadcast({"type": "chat_switched", "id": chat_id})
 
         chat = dict(channel.context.chat.get())
         chat["turn_history"] = await channel.group_history()
@@ -455,10 +455,10 @@ async def create_fastapi(channel):
         """Creates a new chat"""
         return api_result(success=await channel.context.chat.new())
 
-    @app.post("/api/chat/delete/{id}")
-    async def chat_delete(id: str):
+    @app.post("/api/chat/delete/{chat_id}")
+    async def chat_delete(chat_id: str):
         """Deletes a chat by its ID"""
-        await channel.context.chat.delete(id)
+        await channel.context.chat.delete(chat_id)
         return api_result(success=True)
 
     # --- Settings
@@ -796,6 +796,7 @@ async def create_fastapi(channel):
                             if index < 0:
                                 return False
 
+                            # delete_from deletes all messages AFTER the target, so we need to do index-1
                             await channel.context.chat.messages.delete_from(index-1)
                             await ws_mgr.broadcast({
                                 "type": "sync"
@@ -806,7 +807,9 @@ async def create_fastapi(channel):
                             if index is not None and channel:
                                 last_user_message_index = await channel.context.chat.messages.get_last_message_with_role("user", cutoff_index=index)
                                 user_message = await channel.context.chat.messages.get(last_user_message_index)
-                                await channel.context.chat.messages.delete_from(last_user_message_index)
+
+                                # delete_from deletes all messages AFTER the target, so we need to do index-1
+                                await channel.context.chat.messages.delete_from(last_user_message_index-1)
 
                                 if user_message:
                                     await ws_mgr.broadcast({

@@ -62,9 +62,13 @@ class Manager:
         if not self.args.disable_auto_installer:
             system_changed = False
             for chan_name in enabled_channels:
-                installed = await core.modules.install_module_deps(channels, chan_name, self)
-                if installed:
-                    newly_installed_channels.append(chan_name)
+                try:
+                    await core.modules.install_module_deps(channels, chan_name, self)
+                except Exception as e:
+                    core.log(chan_name, f"Error while installing channel dependencies: {core.detail_error(e)}")
+                    continue
+
+                newly_installed_channels.append(chan_name)
 
             if newly_installed_channels:
                 # reload config
@@ -77,31 +81,37 @@ class Manager:
             # add an instance of the channel's class to self.channels
             channel_name = core.modules.get_name(channel)
             try:
-                try:
-                    storage[channel_name] = channel(self, is_user_channel=is_user_channels)
-                    await storage[channel_name].init()
-                except Exception as e:
-                    core.log(channel_name, f"Error while loading channel: {core.detail_error(e)}")
-
-                # run installation hook
-                if channel_name in newly_installed_channels:
-                    try:
-                        await storage[channel_name].on_install()
-                    except Exception as e:
-                        core.log(channel_name, f"Error while installing channel: {core.detail_error(e)}")
-
-                self.log("core", f"loaded {is_user_str}channel : {channel_name}")
+                new_chan = channel(self, is_user_channel=is_user_channels)
+                await new_chan.init()
             except Exception as e:
-                self.log(channel_name, f"Failed to load channel: {core.detail_error(e)}")
+                core.log(channel_name, f"Error while loading channel: {core.detail_error(e)}")
+                continue
+
+            # run installation hook
+            if channel_name in newly_installed_channels:
+                try:
+                    await new_chan.on_install()
+                except Exception as e:
+                    core.log(channel_name, f"Error while installing channel: {core.detail_error(e)}")
+                    continue
+
+            storage[channel_name] = new_chan
+            self.log("core", f"loaded {is_user_str}channel : {channel_name}")
+
+        return True
 
     async def _load_modules(self, storage, modules, enabled_modules, is_user_modules=False):
         # install dependencies
         newly_installed_modules = []
         if not self.args.disable_auto_installer:
             for mod_name in enabled_modules:
-                installed = await core.modules.install_module_deps(modules, mod_name, self)
-                if installed:
-                    newly_installed_modules.append(mod_name)
+                try:
+                    await core.modules.install_module_deps(modules, mod_name, self)
+                except Exception as e:
+                    core.log(mod_name, f"Error while installing module dependencies: {core.detail_error(e)}")
+                    continue
+
+                newly_installed_modules.append(mod_name)
 
             if newly_installed_modules:
                 # reload config
@@ -109,22 +119,28 @@ class Manager:
 
         # import/load only the enabled modules
         for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
-            try:
-                loaded_module = await self.add_module_class(module, is_user_module=is_user_modules)
+            loaded_module = await self.add_module_class(module, is_user_module=is_user_modules)
 
-                # run installation hook
-                if loaded_module.name in newly_installed_modules:
+            # run installation hook
+            if loaded_module.name in newly_installed_modules:
+                try:
                     await loaded_module.on_install()
+                except Exception as e:
+                    core.log(loaded_module.name, f"Error during module install: {core.detail_error(e)}")
+                    continue
 
+            try:
                 await loaded_module._start()
-                await self.load_module_tools(loaded_module)
-
-                storage[loaded_module.name] = loaded_module
-
-                is_user_str = "user " if is_user_modules else ""
-                self.log("core", f"loaded {is_user_str}module : {loaded_module.name}")
             except Exception as e:
-                self.log_error(f"could not load module {module.__name__}", e)
+                core.log(loaded_module.name, f"Error during module internal _start() method: {core.detail_error(e)}")
+                continue
+
+            await self.load_module_tools(loaded_module)
+
+            storage[loaded_module.name] = loaded_module
+
+            is_user_str = "user " if is_user_modules else ""
+            self.log("core", f"loaded {is_user_str}module : {loaded_module.name}")
 
     async def run(self):
         """main loop"""
@@ -377,17 +393,19 @@ class Manager:
 
             if autorestart:
                 if self.channel:
-                    await self.channel.push(f"{module_name.capitalize()} module {'enabled' if new_state else 'disabled'}. Restarting to apply module change..")
+                    await self.channel.push(f"{module_name.capitalize()} module {'enabled' if new_state else 'disabled'}. Restarting to apply change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 
-        return True
+        return toggled
 
     async def toggle_channel(self, channel_name: str, autorestart=True):
         channels = core.config.config["channels"]
         user_channels = core.config.config["user_channels"]
 
         toggled = False
+        new_state = False
+
         for channel_list in [channels, user_channels]:
             enabled = channel_list["enabled"]
             disabled = channel_list["disabled"]
@@ -396,10 +414,12 @@ class Manager:
                 enabled.remove(channel_name)
                 disabled.append(channel_name)
                 toggled = True
+                new_state = False
             elif channel_name in disabled:
                 disabled.remove(channel_name)
                 enabled.append(channel_name)
                 toggled = True
+                new_state = True
             else:
                 continue
 
@@ -408,11 +428,11 @@ class Manager:
 
             if autorestart:
                 if self.channel:
-                    await self.channel.push("restarting to apply change..")
+                    await self.channel.push(f"{channel.name.capitalize()} channel {'enabled' if new_state else 'disabled'}. Restarting to apply change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 
-        return True
+        return toggled
 
     async def reload_module(self, module_name: str):
         """

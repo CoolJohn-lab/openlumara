@@ -146,9 +146,12 @@ class Chat:
     # ------------------
     # Chat Manipulation
     # ------------------
-    async def new(self, category: str = "general", title: str = "", metadata = {}):
+    async def new(self, category: str = "general", title: str = "", metadata = None):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
+
+        if metadata is None:
+            metadata = {}
 
         new_id = str(ulid.ULID())[-8:] # so it turns out truncating the ULID from the front can lead to identical id's.. yikes
         self.data.append({
@@ -224,7 +227,7 @@ class Chat:
                     await self.autoload()
             elif self.current > index:
                 # Current was after deleted item, shift down
-                self.current -= 1
+                await self._set_current(self.current-1)
 
         # start a prompt warmup using this chat's data
         # try:
@@ -260,7 +263,7 @@ class Chat:
 
         return True
 
-    def get(self, key = None):
+    def get(self, key = None, default = None):
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
@@ -272,7 +275,8 @@ class Chat:
         if key in self.data[self.current].keys():
             return self.data[self.current][key]
         else:
-            return {}
+            return default
+
     async def set(self, key, value):
         if self.current is None:
             raise Exception("No chat is currently loaded!")
@@ -302,5 +306,8 @@ class Chat:
         """
         if not self.channel.context.using_api_token_data:
             return await self.channel.context.count_tokens()
+
+        if self.current is None:
+            return 0 # if there is no chat loaded, we have no token usage
 
         return self.data[self.current]["token_usage"]
