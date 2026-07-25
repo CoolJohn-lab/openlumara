@@ -5,13 +5,11 @@
 </button>
 <input type="file" x-ref="file-input" @change="$store.upload.addFile($event)" x-show="false" x-cloak aria-hidden="true" multiple>
 
-<!-- user_input is defined over in index.html, so that we have access to it everywhere -->
 <textarea 
     id="user-input" 
     x-ref="user-input"
     x-model="$store.chat.user_input"
     placeholder="Type a message.." 
-    :disabled="$store.stream.state != 'idle'"
     x-effect="
         if ($store.stream.state === 'idle') {
             $nextTick(() => $refs['user-input'].focus());
@@ -26,7 +24,6 @@
             if (!$store.chat.user_input) { return; }
 
             await $store.chat.send($store.chat.user_input);
-            await $store.chat.clearInput();
             $el.style.height = '48px';
         }
     "
@@ -39,7 +36,6 @@
         if (!$store.chat.user_input) { return; }
 
         await $store.chat.send($store.chat.user_input);
-        await $store.chat.clearInput();
         $el.style.height = '48px';
     }
     "
@@ -54,6 +50,7 @@ await simpleSocketSend({
 ">
     <span class="stop-text">Stop</span>
     <!--
+    TODO: add typewriter back into the webui
     <span class="streaming-icon">
         <svg class="icon-streaming" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>

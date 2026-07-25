@@ -109,7 +109,15 @@ CHAT_STORE = {
 
 
     async send(text) {
+        stream = Alpine.store('stream');
+        if (stream.state !== 'idle') {
+            // don't allow sending during a stream
+            // (TODO: allow nudging (interrupting the stream and sending a new message))
+            return;
+        }
+
         Alpine.store("stream").state = "sending";
+        await this.clearInput();
 
         // handle any files the user may have attached
         const uploadStore = Alpine.store("upload");
