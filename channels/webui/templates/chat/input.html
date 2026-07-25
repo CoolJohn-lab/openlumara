@@ -27,17 +27,17 @@
             $el.style.height = '48px';
         }
     "
+    @focus="$autosize($el)"
+    @blur="$el.style.height = '48px'"
 ></textarea>
 
 <button id="send" aria-label="Send message"
     @click="
-    if (!$event.shiftKey) {
         $event.preventDefault();
         if (!$store.chat.user_input) { return; }
 
         await $store.chat.send($store.chat.user_input);
         $el.style.height = '48px';
-    }
     "
     x-show="$store.stream.state === 'idle'"
 >Send</button>
