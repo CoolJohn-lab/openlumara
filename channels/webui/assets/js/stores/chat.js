@@ -140,6 +140,18 @@ CHAT_STORE = {
     /* ----------------------
      * message actions
      * ----------------------- */
+    async copyMessage(turnIndex) {
+      const turn = this.turnHistory[turnIndex];
+      const msg = turn.messages[turn.messages.length-1]; // last message in the turn
+      navigator.clipboard.writeText(msg.content)
+        .then(() => {
+            return true;
+        })
+        .catch(err => {
+            return false;
+        });
+    },
+
     async deleteMessage(turnIndex) {
         const turn = this.turnHistory[turnIndex];
         await simpleSocketSend({

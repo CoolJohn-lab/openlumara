@@ -1,9 +1,28 @@
 <div class="message-buttons">
+    <button
+        x-data="{ copied: false }"
+        @click="
+            $store.chat.copyMessage(turnIndex).then(() => {
+                copied = true;
+                setTimeout(() => copied = false, 2000);
+            })
+        "
+    title="Copy" :disabled="$store.stream.state != 'idle'">
+        <!-- Show checkmark when the copy was successful -->
+        <template x-if="copied">
+            {% include 'svg/checkmark.svg' %}
+        </template>
+        
+        <!-- Show copy icon otherwise -->
+        <template x-if="!copied">
+            {% include 'svg/copy.svg' %}
+        </template>
+    </button>
     <button @click="$store.chat.startEdit(turnIndex)" title="Edit" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/edit.svg' %}
     </button>
     <button @click="$store.chat.regenerateMessage(turnIndex)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
-        {% include 'svg/reload.svg' %}
+        {% include 'svg/regenerate.svg' %}
     </button>
     <button @click="$store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/trash.svg' %}
