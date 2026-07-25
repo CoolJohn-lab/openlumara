@@ -53,6 +53,12 @@ div  {
 /* alpine-specific fix that they officially recommend */
 [x-cloak] { display: none !important; }
 
+/* disabled element styling */
+*:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
 /* ==========================================================================
  *  Modern Scrollbar Styling (Theme Aware)
  *  ========================================================================== */
