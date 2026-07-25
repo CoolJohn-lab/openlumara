@@ -59,7 +59,7 @@
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
 
-                        <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
+                        <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
                     </div>

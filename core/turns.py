@@ -24,11 +24,15 @@ class TurnCollector:
 
         for index, msg in enumerate(history):
             role = msg.get('role')
+
+            # add the index to the message so that it can be directly targeted no matter which turn it is in
+            msg["index"] = index
             
             if role == 'user':
                 if current_assistant_turn:
                     # if a user message arrives and it's currently still
                     # the assistant's turn, that means we finalize it, and move onto a new turn!
+                    current_assistant_turn["last_message_index"] = index-1
                     turns.append(current_assistant_turn)
                     current_assistant_turn = None
                 

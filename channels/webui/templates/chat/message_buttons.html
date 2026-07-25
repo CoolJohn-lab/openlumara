@@ -1,14 +1,11 @@
 <div class="message-buttons">
-    <template x-if="turn.role === 'user'">
-        <button @click="$store.chat.startEdit(turnIndex)" title="Edit" :disabled="$store.stream.state != 'idle'">
-            {% include 'svg/edit.svg' %}
-        </button>
-    </template>
-
-    <button @click="$store.chat.regenerateMessage(targetIndex)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+    <button @click="$store.chat.startEdit(turnIndex)" title="Edit" :disabled="$store.stream.state != 'idle'">
+        {% include 'svg/edit.svg' %}
+    </button>
+    <button @click="$store.chat.regenerateMessage(turnIndex)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/reload.svg' %}
     </button>
-    <button @click="$store.chat.deleteMessage(targetIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
+    <button @click="$store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/trash.svg' %}
     </button>
 </div>

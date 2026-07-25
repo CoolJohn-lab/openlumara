@@ -148,32 +148,33 @@ CHAT_STORE = {
     /* ----------------------
      * message actions
      * ----------------------- */
-    async deleteMessage(index) {
+    async deleteMessage(turnIndex) {
+        const turn = this.turnHistory[turnIndex];
         await simpleSocketSend({
             "type": "message_delete",
-            "index": index
+            "index": turn.first_message_index
         });
     },
 
-    async regenerateMessage(index) {
+    async regenerateMessage(turnIndex) {
+        const turn = this.turnHistory[turnIndex];
+
         Alpine.store('stream').userMsg = null;
         Alpine.nextTick(async () => {
             await simpleSocketSend({
                 "type": "message_regenerate",
-                "index": index
+                "index": turn.first_message_index
             });
         });
     },
 
     async startEdit(turnIndex) {
         const turn = this.turnHistory[turnIndex];
-        const msg = turn.messages[0];
+        const msg = turn.messages[turn.messages.length-1]; // last message in the turn
         console.log(msg);
-        console.log(turn);
-        if (msg) {
-            this.editingMessageIndex = turn.first_message_index;
-            this.editContent = msg.content || msg.reasoning_content || '';
-        }
+
+        this.editingMessageIndex = msg.index;
+        this.editContent = msg.content;
     },
 
     async cancelEdit() {
