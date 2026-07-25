@@ -95,11 +95,13 @@ class Cli(core.channel.Channel):
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type == "prompt_progress":
+            if token_type == "error":
+                print()
+                self.log(self.name, f"Error: {content}")
+            elif token_type == "prompt_progress":
                 print("\rprocessing your request..", end="", flush=True)
                 processing_prompt = True
-
-            if token_type in ["content", "reasoning"]:
+            elif token_type in ["content", "reasoning"]:
                 if not first_token_received:
                     # remove sending indicator using \r
                     process_padding = 25 if processing_prompt else 0 # 25 is the length of "processing your request.."
@@ -115,7 +117,6 @@ class Cli(core.channel.Channel):
         if message_after:
             print(message_after)
 
-        print()
         print()
 
     async def run(self):

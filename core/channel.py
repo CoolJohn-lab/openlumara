@@ -714,6 +714,8 @@ class Channel:
 
             if token_type == "prompt_progress":
                 yield token
+            elif token_type == "error":
+                yield token
 
             # # collapse consecutive newlines
             try:
