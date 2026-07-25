@@ -154,11 +154,11 @@ class ApiBridge(core.channel.Channel):
                 raise HTTPException(status_code=400, detail="No messages provided")
             
             last_msg = chat_req.messages[-1]
-            ol_message = {"role": last_msg.role, "content": last_msg.content}
+            # ol_message = {"role": last_msg.role, "content": last_msg.content}
 
             if chat_req.stream:
                 return StreamingResponse(
-                    self._stream_handler(ol_message, chat_req.model),
+                    self._stream_handler(last_msg.content, chat_req.model),
                     media_type="text/event-stream"
                 )
             else:
@@ -194,7 +194,7 @@ class ApiBridge(core.channel.Channel):
     async def _completion_handler(self, ol_message: dict, model: str) -> JSONResponse:
         try:
             # send the request to the framework and format it
-            response_dict = await self.send(ol_message, commands_authorized=True)
+            response_dict = await self.send(ol_message.get("content"), commands_authorized=True)
             response_dict = self.format_message(response_dict)
             content = response_dict.get("content", "")
 
@@ -225,7 +225,7 @@ class ApiBridge(core.channel.Channel):
                 content={"error": {"message": str(e), "type": "server_error", "param": None, "code": "internal_error"}}
             )
 
-    async def _stream_handler(self, ol_message: dict, model: str):
+    async def _stream_handler(self, ol_message: str, model: str):
         try:
             chat_id = f"chatcmpl-{uuid.uuid4()}"
             created_time = int(time.time())

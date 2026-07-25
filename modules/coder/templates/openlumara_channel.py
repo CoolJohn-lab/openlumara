@@ -97,7 +97,7 @@ class MyChannel(core.channel.Channel):
             # returns an openAI message dictionary of format {"role": role, "content": content} (or the multimodal equivalent as per openai spec)
 
             # commands_authorized determines whether the user is able to use /commands to control openlumara on a system level. you can use this, for example, with a UID check on a public bot, to reject commands if the user sending the command isn't the bot admin.
-            response_dict = await self.send({"role": "user", "content": user_input}, commands_authorized=True)
+            response_dict = await self.send(user_input, commands_authorized=True)
 
             # optionally, run the response dict through format_message to make the output much nicer (formats reasoning headers, toolcalls etc)
             response_dict = self.format_message(response_dict)

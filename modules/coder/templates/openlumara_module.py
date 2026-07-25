@@ -123,7 +123,7 @@ class ExampleModule(core.module.Module):
         my_value = self.config.get("example_setting")
 
         # use this in order to make calls to the AI model
-        ai_response = await self.channel.send({"role": "user", "content": "This message will be sent to the AI. THe response of it will be the AI's response as a string")
+        ai_response = await self.channel.send("This message will be sent to the AI. The response of it will be the AI's response as a string")
 
         # use this to push a message out to the user
         # this message will appear without the user having to send a message first

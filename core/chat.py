@@ -9,9 +9,9 @@ class Chat:
         self.channel = channel
 
         # Auto-migrate if old format detected
-        old_chats_file = core.get_data_path(f"{channel.name}_chats.json")
-        if os.path.exists(old_chats_file):
-            self._migrate_if_needed()
+        # old_chats_file = core.get_data_path(f"{channel.name}_chats.json")
+        # if os.path.exists(old_chats_file):
+        #     self._migrate_if_needed()
 
         self.data = core.storage.StorageList(os.path.join(self.path, "index"), "msgpack")
         self.messages = None # initialized by autoload()
@@ -21,6 +21,7 @@ class Chat:
         self.current_save_path = core.get_data_path(os.path.join(self.path, f"current"))
 
     async def autoload(self):
+        """loads the last used chat if applicable, otherwise it creates a new chat. basically the class's async constructor"""
         # chat autoresume
         if os.path.exists(self.current_save_path) and core.config.get("core", {}).get("auto_resume_chats"):
             try:
@@ -36,10 +37,14 @@ class Chat:
         # create a new chat if one wasn't found
         await self.new()
 
+    # ------------------
+    # helper functions
+    # ------------------
     async def _set_current(self, index: int):
+        """load a chat and its messages by index"""
         self.current = index
 
-        # store current index into a simple file
+        # store current index into a simple file, for chat autoloading later
         with open(self.current_save_path, "w") as f:
             f.write(str(index))
 
@@ -138,6 +143,9 @@ class Chat:
         
         self.channel.log(self.channel.name, f"[MIGRATE] Migrated {len(new_chats)} chats for '{self.channel.name}'")
 
+    # ------------------
+    # Chat Manipulation
+    # ------------------
     async def new(self, category: str = "general", title: str = "", metadata = {}):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
@@ -189,15 +197,31 @@ class Chat:
         if index is None:
             return False
 
-        await self.messages.clear()
+        # remove the chat history file
+        messages_path = core.get_data_path(os.path.join(
+            "chats",
+            self.channel.name,
+            "history",
+            f"{id}.json"
+        ))
+        try:
+            os.remove(messages_path)
+        except FileNotFoundError:
+            pass
+
+        # and remove it from the index file
         self.data.pop(index)
         self.data.save()
 
         # Adjust current index if needed
         if self.current is not None:
             if self.current == index:
-                # Deleted the current chat - reset or move to previous
-                await self._set_current(min(index, len(self.data) - 1) if self.data else None)
+                if self.data:
+                    # that means we've deleted the current chat
+                    await self._set_current(min(index, len(self.data) - 1))
+                else:
+                    # we've ended up with blank data.. so autocreate a new one!
+                    await self.autoload()
             elif self.current > index:
                 # Current was after deleted item, shift down
                 self.current -= 1
@@ -219,7 +243,11 @@ class Chat:
     async def load(self, id: str):
         index = self._find_index(id)
 
-        if index is None or self.current == index:
+        if index is None:
+            raise Exception("tried to load a blank chat id!")
+
+        if self.current == index:
+            # silently allow it
             return False
 
         await self._set_current(index)
@@ -236,15 +264,15 @@ class Chat:
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
+        # return the chat itself if chat.get() is called without a key
         if key is None:
             return self.data[self.current]
 
+        # otherwise, get the chat's requested value
         if key in self.data[self.current].keys():
             return self.data[self.current][key]
         else:
             return {}
-        
-        raise Exception(f"{key} is not a valid chat property")
     async def set(self, key, value):
         if self.current is None:
             raise Exception("No chat is currently loaded!")
@@ -272,8 +300,7 @@ class Chat:
         Prioritizes the API's data above all,
         but if not available, will fall back on counting locally using tiktoken
         """
-        if not self.using_api_token_data:
+        if not self.channel.context.using_api_token_data:
             return await self.channel.context.count_tokens()
 
         return self.data[self.current]["token_usage"]
-

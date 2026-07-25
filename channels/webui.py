@@ -404,7 +404,11 @@ async def create_fastapi(channel):
     @app.get("/api/chat/load/{id}")
     async def chat_load(id: str, request: fastapi.Request):
         """Loads a specific chat by its id"""
-        success = await channel.context.chat.load(id)
+        try:
+            success = await channel.context.chat.load(id)
+        except Exception as e:
+            return api_result(f"error while loading chat: {core.detail_error(e)}", success=False)
+
         if not success:
             # that likely means this is already the loaded chat
             chat = dict(channel.context.chat.get())
@@ -707,8 +711,7 @@ async def create_fastapi(channel):
                                     channel.stream_cancellations.add(stream_id)
                         case "reload_messages":
                             await ws_mgr.broadcast({
-                                "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.messages.get())
+                                "type": "sync"
                             })
                         case "rename":
                             new_title = data.get("title")
@@ -725,7 +728,12 @@ async def create_fastapi(channel):
                                 if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
                                     ws_mgr.active_stream_task.cancel()
 
-                                await channel.context.chat.load(new_chat_id)
+
+                                try:
+                                    await channel.context.chat.load(new_chat_id)
+                                except Exception as e:
+                                    await ws_mgr.broadcast({"type": "error", "content": f"Failed to load chat: {e}"})
+
                                 ws_mgr.active_chat_id = new_chat_id
 
                                 await ws_mgr.broadcast({
@@ -781,18 +789,16 @@ async def create_fastapi(channel):
                             await channel.context.chat.messages.edit(index, message)
 
                             await ws_mgr.broadcast({
-                                "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.messags.get())
+                                "type": "sync"
                             })
                         case "message_delete":
                             index = data.get("index")
-                            if not index:
+                            if index < 0:
                                 return False
 
                             await channel.context.chat.messages.delete_from(index-1)
                             await ws_mgr.broadcast({
-                                "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.messages.get())
+                                "type": "sync"
                             })
                         case "message_regenerate":
                             index = data.get("index")
@@ -800,13 +806,13 @@ async def create_fastapi(channel):
                             if index is not None and channel:
                                 last_user_message_index = await channel.context.chat.messages.get_last_message_with_role("user", cutoff_index=index)
                                 user_message = await channel.context.chat.messages.get(last_user_message_index)
-                                await channel.context.chat.messages.delete_from(last_user_message_index-1)
+                                await channel.context.chat.messages.delete_from(last_user_message_index)
 
                                 if user_message:
                                     await ws_mgr.broadcast({
-                                        "type": "messages_updated",
-                                        "messages": await channel.context.chat.messages.get()
+                                        "type": "sync",
                                     })
+                                    print(user_message)
                                     await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message.get("content"))
                                 else:
                                     await ws_mgr.broadcast({
@@ -920,7 +926,7 @@ class WebSocketManager:
                             "buffer": []
                         })
                         await self.broadcast({
-                            "type": "messages_updated"
+                            "type": "sync"
                         })
                         return
                     case _:

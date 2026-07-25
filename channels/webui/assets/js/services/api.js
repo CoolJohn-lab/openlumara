@@ -32,6 +32,7 @@ async function simpleApiPost(url, content=null) {
 
 async function simpleSocketSend(data) {
     try {
+        console.log(data);
         return window.socket.send(JSON.stringify(data));
     } catch (e) {
         return false

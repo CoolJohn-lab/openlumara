@@ -12,7 +12,7 @@ class Messages:
         # for index in range(len(self.data) - 1, -1, -1):
         #     chat = self.data[index]
         #     messages = chat.get("messages", [])
-            
+
         #     # find any blank chats and delete them
         #     if not messages:
         #         self.data.pop(index)
@@ -31,12 +31,14 @@ class Messages:
 
     async def get(self, index = None):
         """get message history of current chat"""
-        if index:
-            if index > len(self.data):
+        # allow targeting a specific index
+        if index is not None:
+            if index >= len(self.data):
                 raise Exception("Invalid message index")
 
             return self.data[index]
 
+        # if no index is specified, just return the entire message history
         return self.data
 
     async def add(self, message: dict, cmd=False, ghost = False):
@@ -82,7 +84,7 @@ class Messages:
         index = len(self.data) - 1
         await self.save()
         return True
-    
+
     async def edit(self, index: int, message):
         """edit message by its index"""
         if index >= len(self.data):
@@ -106,13 +108,19 @@ class Messages:
         """
         Deletes all messages below a certain index
         """
-        if index > len(self.data):
+        if index >= len(self.data):
+            print("uhoh")
             raise Exception("Invalid message index")
 
         # return all messages up to and including the target message
         new_messages = self.data[:index+1]
 
-        self.data = new_messages
+        self.data.load(new_messages)
+        await self.save()
+        return True
+
+    async def clear(self):
+        self.data.clear()
         return True
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):
@@ -137,9 +145,6 @@ class Messages:
             start_index = len(self.data)
 
         for index in range(start_index, -1, -1):
-            if index >= len(self.data):
-                continue
-
             message = self.data[index]
             if message.get("role") == role:
                 return index

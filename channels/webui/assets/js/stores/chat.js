@@ -151,9 +151,6 @@ CHAT_STORE = {
     },
 
     async regenerateMessage(index) {
-        await this.reloadChat();
-        Alpine.store('stream').userMsg = null;
-        await Alpine.nextTick();
         await simpleSocketSend({
             "type": "message_regenerate",
             "index": index

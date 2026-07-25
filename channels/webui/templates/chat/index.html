@@ -44,7 +44,7 @@
                 <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
                     <div class="message user">
                         {% include 'chat/turns/user.html' %}
-                        <div x-data="{ msgIndex: turn.first_message_index }" class="fullwidth">
+                        <div x-data="{ msgIndex: turn.first_message_index, get targetIndex() { return turn.first_message_index } }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
                     </div>
@@ -59,7 +59,7 @@
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
 
-                        <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
+                        <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
                     </div>
@@ -73,7 +73,7 @@
         <div class="message-wrapper user" x-data="{ message: $store.stream.userMsg, turn: {} }">
             <div class="message user">
                 {% include 'chat/turns/user.html' %}
-                <div class="fullwidth" x-data="{ targetIndex: $store.stream.userMsg.index }">
+                <div class="fullwidth" x-data="{ get targetIndex() { return $store.stream.userMsg.index } }">
                     {% include 'chat/message_buttons.html' %}
                 </div>
             </div>
@@ -92,7 +92,7 @@
                     {% include 'chat/prompt_processing.html' %}
                 </template>
 
-                <div x-data="{ targetIndex: $store.stream.turn.first_message_index, turn: {} }" class="fullwidth">
+                <div x-data="{ get targetIndex() { return $store.stream.turn.first_message_index }, turn: {} }" class="fullwidth">
                     {% include 'chat/message_buttons.html' %}
                 </div>
             </div>

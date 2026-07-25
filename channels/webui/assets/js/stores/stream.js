@@ -19,7 +19,7 @@ let STREAM_STORE = {
     // tracks the index of a confirmed user message
     userMessageId: null,
 
-    async clearTokens() {
+    async clear() {
         this.turn = [];
         this.userMsg = null;
         this.processing = {};

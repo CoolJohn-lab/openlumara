@@ -228,9 +228,12 @@ async function handleWebSocketMessage(data) {
 
             break;
 
-        case "messages_updated":
+        case "sync":
             // make sure we sync chat
+            chat.turnHistory = [];
+            await stream.clear();
             await chat.reloadChat();
+            console.log("forcing sync");
             break;
 
         case "chat_switched":
@@ -248,8 +251,7 @@ async function handleWebSocketMessage(data) {
             chat.turnHistory.push(stream.turn);
             
             // then clear the user message placeholder and the current turn
-            stream.userMsg = null;
-            stream.turn = [];
+            await stream.clear();
 
             // finalize the stream
             AudioManager.play("completion");

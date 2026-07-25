@@ -230,10 +230,7 @@ class Context:
         combined_size_words = message_hist_size_words + sysprompt_size_words + histend_size_words
 
         # Get total token usage - prefer API-provided usage if available
-        if hasattr(self.chat, 'token_usage') and self.chat.token_usage > 0:
-            token_usage = self.chat.token_usage
-        else:
-            token_usage = await self.count_tokens(await self.get(system_prompt=True))
+        token_usage = await self.chat.get_token_usage()
 
         return {
             "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
