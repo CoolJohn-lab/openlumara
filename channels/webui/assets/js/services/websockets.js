@@ -75,8 +75,8 @@ async function scheduleWsReconnect() {
 async function handleWebSocketMessage(data) {
     // we store all the stream-related data in an Alpine store
     const stream = Alpine.store("stream");
-
     const chat = Alpine.store("chat");
+    const ui = Alpine.store('ui');
 
     data_type = data.type;
     data_content = data.content;
@@ -107,7 +107,7 @@ async function handleWebSocketMessage(data) {
             await chat.reloadChat();
 
             // force scroll to bottom
-            await Alpine.store('ui').forceScrollToBottom();
+            await ui.forceScrollToBottom();
             break;
 
         case "user_message_confirmed":
@@ -118,7 +118,7 @@ async function handleWebSocketMessage(data) {
             stream.turn = data.turns;
 
             // always scroll to the bottom upon a token coming in
-            await Alpine.store('ui').scrollToBottom();
+            await ui.scrollToBottom();
 
             // process depending on what segment we're in
             const current_segment = stream.turn.messages[stream.turn.messages.length-1]
@@ -152,7 +152,8 @@ async function handleWebSocketMessage(data) {
 
             if (current_segment.is_cmd) {
                 // reload the global state in case something changed due to the command
-                await chat.reloadChat();
+                await chat.reloadChats();
+                await chat.reloadCategories();
             }
 
             break;
@@ -166,7 +167,7 @@ async function handleWebSocketMessage(data) {
             await AudioManager.play('response_start');
             await Alpine.store('notifications').send(data.content.content);
 
-            await Alpine.store('ui').forceScrollToBottom();
+            await ui.forceScrollToBottom();
             break;
 
         case "log":
@@ -222,7 +223,7 @@ async function handleWebSocketMessage(data) {
             }
 
             // always scroll to the bottom upon a token coming in
-            await Alpine.store('ui').scrollToBottom();
+            await ui.scrollToBottom();
 
             break;
 
@@ -231,6 +232,13 @@ async function handleWebSocketMessage(data) {
             chat.turnHistory = [];
             await stream.clear();
             await chat.reloadChat();
+
+            if (ui.scrollToTurnIndex) {
+                await ui.scrollToTurn(ui.scrollToTurnIndex);
+            } else {
+                await ui.scrollToBottom();
+            }
+
             break;
 
         case "chat_switched":
@@ -252,7 +260,7 @@ async function handleWebSocketMessage(data) {
 
             // finalize the stream
             AudioManager.play("completion");
-            await Alpine.store('ui').scrollToBottom();
+            await ui.scrollToBottom();
             stream.state = 'idle';
 
             // and finally, sync back up with the backend

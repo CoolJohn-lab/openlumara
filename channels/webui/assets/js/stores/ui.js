@@ -5,6 +5,7 @@ UI_STORE = {
     notice: null,
 
     shouldScroll: true,
+    scrollToTurnIndex: null,
 
     windowWidth: window.innerWidth,
     isMobile: false,
@@ -113,4 +114,24 @@ UI_STORE = {
             this.shouldScroll = true;
         });
     },
+
+    async scrollToTurn(turnIndex) {
+        if (turnIndex === null || turnIndex === undefined) return;
+
+        Alpine.nextTick(() => {
+            const el = document.querySelector(`[data-turn-index="${turnIndex}"]`);
+            if (!el) return;
+
+            const container = document.getElementById('messages');
+            if (!container) return;
+
+            // Calculate scroll position to center the element
+            const containerRect = container.getBoundingClientRect();
+            const elementRect = el.getBoundingClientRect();
+            const offset = elementRect.top - containerRect.top - (containerRect.height / 2) + (elementRect.height / 2);
+            container.scrollTop += offset;
+
+            this.scrollToTurnIndex = null;
+        });
+    }
 }

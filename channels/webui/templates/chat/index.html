@@ -38,7 +38,7 @@
 
     <!-- historical turns -->
     <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
-        <div class="fullwidth">
+        <div class="fullwidth turn" :data-turn-index="turnIndex">
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">

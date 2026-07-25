@@ -79,16 +79,6 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
 
         this.turnHistory = result.turn_history;
-
-        await Alpine.store('ui').scrollToBottom();
-
-        /*
-         * since the AI can move chats to different categories,
-         * the category might have changed
-         * or a new one might have been created
-         */
-        await this.reloadCategories();
-        await this.reloadChats();
     },
 
     async reloadChats() {
@@ -173,9 +163,10 @@ CHAT_STORE = {
     async startEdit(turnIndex) {
         const turn = this.turnHistory[turnIndex];
         const msg = turn.messages[turn.messages.length-1]; // last message in the turn
-
+        
         this.editingMessageIndex = msg.index;
         this.editContent = msg.content;
+        Alpine.store('ui').scrollToTurnIndex = turnIndex;
     },
 
     async cancelEdit() {
