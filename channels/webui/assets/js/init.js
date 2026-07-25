@@ -38,8 +38,8 @@ document.addEventListener('alpine:init', async () => {
     // fetch current chat
     await Alpine.store('chat').load();
 
-    // fetch logs
-    await Alpine.store('system').reloadLogs();
+    // fetch any relevant system data (like system logs, max context, etc)
+    await Alpine.store('system').loadData();
 
     // do the initial scroll to bottom
     requestAnimationFrame(() => {

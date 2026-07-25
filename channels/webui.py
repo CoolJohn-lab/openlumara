@@ -540,6 +540,14 @@ async def create_fastapi(channel):
     # System.. stuff
     # ----------------------------
     # -- GET
+    @app.get("/api/system/data")
+    async def get_data():
+        """returns any relevant data for the webUI to use"""
+        data = {
+            "max_context": core.config.get("api", "max_context")
+        }
+
+        return api_result(data)
     @app.get("/api/system/logs")
     async def get_logs():
         return api_result(channel.logs)

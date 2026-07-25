@@ -1,0 +1,22 @@
+<div id="token-usage-bar" x-data="{
+    get percentage() {
+        if (this.maxContext === 0) return 0;
+        return ($store.chat.currentTokenUsage / $store.system.data.max_context) * 100;
+    }
+}">
+    <span class="text" 
+          x-text="`Tokens: ${$store.chat.currentTokenUsage} / ${$store.system.data.max_context}`">
+    </span>
+    <div id="token-usage-container" class="container">
+        <div class="bg">
+            <div class="fill"
+                 :class="{
+                    'active': percentage >= 70,
+                    'warning': percentage >= 75,
+                    'shimmer-active': $store.stream.state !== 'idle'
+                 }"
+                 :style="`width: ${Math.min(percentage, 100)}%;`">
+            </div>
+        </div>
+    </div>
+</div>

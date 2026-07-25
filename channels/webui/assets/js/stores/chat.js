@@ -16,6 +16,8 @@ CHAT_STORE = {
     user_input: '',
     last_user_input: '',
 
+    currentTokenUsage: 0,
+
     async load() {
         // called by Alpine.init
         await this.reloadChats();
@@ -28,6 +30,7 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
         this.turnHistory = result.turn_history;
+        this.currentTokenUsage = result.token_usage;
     },
 
     /* ----------------------
@@ -48,6 +51,7 @@ CHAT_STORE = {
         this.turnHistory = result.turn_history;
 
         ui = Alpine.store('ui');
+        this.currentTokenUsage = result.token_usage;
 
         // make sure it always shows the bottom of the chat
         await ui.forceScrollToBottom();
@@ -58,6 +62,7 @@ CHAT_STORE = {
 
         this.chat = await simpleApiFetch('/api/chat/current');
         this.selectedChat = this.chat.id;
+        this.currentTokenUsage = 0;
 
         await this.reloadChats();
         await this.reloadChat();

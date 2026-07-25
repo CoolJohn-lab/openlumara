@@ -1,4 +1,5 @@
 SYSTEM_STORE = {
+    data: {},
     logs: [],
     running: true,
     restarting: false,
@@ -11,7 +12,8 @@ SYSTEM_STORE = {
         this.restarting = false;
     },
 
-    async reloadLogs() {
+    async loadData() {
         this.logs = await simpleApiFetch("/api/system/logs");
+        this.data = await simpleApiFetch("/api/system/data");
     }
 }

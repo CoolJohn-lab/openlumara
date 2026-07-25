@@ -2,7 +2,7 @@ const UPLOAD_STORE = {
     files: [],
 
     addFile(event) {
-        this.files = Array.from(event.target.files);
+        this.files.push(...event.target.files);
         if (this.files.length === 0) return;
         event.target.value = "";
     },

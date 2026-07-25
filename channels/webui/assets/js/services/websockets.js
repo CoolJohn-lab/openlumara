@@ -209,6 +209,8 @@ async function handleWebSocketMessage(data) {
 
                     AudioManager.playProcessingSound();
                     break;
+                case "token_usage":
+                    chat.currentTokenUsage = token_content;
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
                     stream.processing = {};
