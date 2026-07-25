@@ -1,4 +1,5 @@
 import core
+import datetime
 
 class Chats(core.module.Module):
     """Lets you or the AI manage your chats"""
@@ -60,7 +61,8 @@ class Chats(core.module.Module):
 
         output = "" if not found else f"Found these chats containing '{query}':\n\n"
         for chat in found:
-            output += f"[{chat.get('id')}] {chat.get('title')}\n"
+            date_str = datetime.datetime.fromisoformat(chat.get('updated')).strftime("%x %X")
+            output += f"[{date_str}] [{chat.get('id')}] {chat.get('title')}\n"
 
         return output
 

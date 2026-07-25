@@ -361,19 +361,28 @@ class Chat:
         
         found_chats = []
         for chat_meta in self.data:
+            found = dict(chat_meta)
+
             chat_id = chat_meta.get("id")
             if not chat_id:
                 continue
             
+            if query_lower in chat_meta.get("title").lower():
+                found["title_match"] = True
+            
             # Load messages from the history file
             history_path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
             if not os.path.exists(history_path):
+                if found.get("title_match"):
+                    found_chats.append(found)
                 continue
             
             try:
                 with open(history_path, 'r', encoding='utf-8') as f:
                     messages = json.load(f)
             except (json.JSONDecodeError, Exception):
+                if found.get("title_match"):
+                    found_chats.append(found)
                 continue
             
             # Search through messages
@@ -413,19 +422,20 @@ class Chat:
                     found_messages.append(snippet)
             
             if found_messages:
-                found_chats.append({
-                    "id": chat_meta.get("id"),
-                    "title": chat_meta.get("title"),
-                    "category": chat_meta.get("category"),
-                    "created": chat_meta.get("created"),
-                    "updated": chat_meta.get("updated"),
+                found.update({
                     "messages_found": len(found_messages),
                     "message_snippets": found_messages
                 })
-
+                found_chats.append(found)
                     
             if len(found_chats) >= max_results:
                 return found_chats
+
+        # Sort with priority: title matches first, then content-only matches
+        # Within each group, sort by updated date descending
+        # Use stable sort: first by date descending, then by title_match (True first)
+        found_chats.sort(key=lambda x: x["updated"] or "", reverse=True)
+        found_chats.sort(key=lambda x: not x.get("title_match"))  # not True=False=0 sorts before not False=True=1
         
         return found_chats
 

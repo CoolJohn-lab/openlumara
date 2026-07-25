@@ -358,8 +358,9 @@ class Commands:
                     return self.result("No saved chats found.", False)
 
                 result = f"Saved chats for {self.channel.name}:\n"
-                for conv in chats[-20:]: # only the last 20 to avoid overwhelming the AI
-                    result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
+                for conv in reversed(chats[:10]): # only the first 10 to avoid overwhelming the AI
+                    date_str = datetime.datetime.fromisoformat(conv.get('updated')).strftime("%x %X")
+                    result += f"- [{date_str}] [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
 
                 return result
             case "chat":
