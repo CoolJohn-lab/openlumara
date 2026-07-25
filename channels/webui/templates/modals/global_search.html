@@ -1,0 +1,112 @@
+<!-- Global Search Modal -->
+<template x-if="$store.ui.currentModal === 'global_search'" x-cloak>
+    <div @keydown.escape.window="$store.ui.closeModal()">
+        <div class="global-search-modal modal" x-data="globalSearch()" @keydown.enter.stop="enterResult()" @keydown.arrow-down.prevent="navigateResults(1)" @keydown.arrow-up.prevent="navigateResults(-1)">
+            
+            <!-- Modal Content -->
+            <div class="global-search-modal-content">
+                <div class="global-search-header">
+                    <svg class="global-search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input 
+                        x-ref="searchInput"
+                        id="global-search-input"
+                        type="text" 
+                        x-model="query" 
+                        @input="search()"
+                        class="global-search-input" 
+                        placeholder="Search all chats..."
+                        aria-label="Search all chats"
+                    >
+                    <button class="global-search-close" @click="$store.ui.closeModal()" aria-label="Close search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="global-search-content-toggle">
+                    <label class="global-search-checkbox">
+                        <input type="checkbox" x-model="searchInContent">
+                        <span class="global-search-checkbox-label">Search in message content</span>
+                    </label>
+                </div>
+                    
+                <!-- Results count -->
+                <template x-if="!loading && results.length > 0">
+                    <div class="global-search-result-count" x-text="results.length + ' result' + (results.length !== 1 ? 's' : '')"></div>
+                </template>
+                        
+                
+                <div class="global-search-content">
+                    <div class="global-search-results">
+                        <!-- Loading state -->
+                        <template x-if="loading">
+                            <div class="global-search-loading">
+                                <div class="spinner"></div>
+                                <span class="loading-text">Searching...</span>
+                            </div>
+                        </template>
+                        
+                        <!-- Empty state (no query yet) -->
+                        <template x-if="!loading && !query.trim()">
+                            <div class="global-search-empty">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                <p>Start typing to search through all chats</p>
+                            </div>
+                        </template>
+                        
+                        <!-- No results -->
+                        <template x-if="!loading && query.trim() && results.length === 0">
+                            <div class="global-search-no-results">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                <p>No results found for "<span x-text="query"></span>"</p>
+                            </div>
+                        </template>
+                        
+                        <!-- Results list -->
+                        <template x-for="(result, index) in results" :key="result.id">
+                            <div 
+                                class="global-search-result"
+                                :class="{ 'active': index === activeIndex }"
+                                @click="selectResult(result.id)"
+                                @mouseenter="activeIndex = index"
+                                tabindex="0"
+                                role="button"
+                            >
+                                <div class="global-search-result-header">
+                                    <span class="global-search-result-title" x-html="highlightQuery(result.title, query)"></span>
+                                    <span class="global-search-result-date" x-text="formatDate(result.updated) || formatDate(result.created)"></span>
+                                </div>
+                                
+                                <template x-if="result.message_snippets">
+                                    <div class="global-search-result-snippet" x-html="highlightQuery(result.message_snippets[0], query)"></div>
+                                </template>
+                                
+                                <template x-if="result.tags && result.tags.length > 0">
+                                    <div class="global-search-result-tags">
+                                        <template x-for="tag in result.tags.slice(0, 3)" :key="tag">
+                                            <span class="global-search-result-tag" x-text="tag"></span>
+                                        </template>
+                                        <template x-if="result.tags.length > 3">
+                                            <span class="global-search-result-tag">+<span x-text="result.tags.length - 3"></span></span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

@@ -46,6 +46,8 @@ document.addEventListener('alpine:init', async () => {
         Alpine.store('ui').forceScrollToBottom();
     });
 
+    await registerKeyboardShortcuts();
+
     // auto-close sidebar on resizing to below desktop size (mobile size)
     // window.addEventListener('resize', () => {
     //     if (window.innerWidth < 768 && Alpine.store('ui').sidebarOpen) {

@@ -6,3 +6,25 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+
+    // Ensure UTC parsing by appending 'Z' if missing
+    const cleanDate = dateString.endsWith('Z') || dateString.endsWith('+00:00')
+        ? dateString
+        : dateString + 'Z';
+
+    const date = new Date(cleanDate);
+    const now = new Date();
+    const diffMs = date - now;
+
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+    if (Math.abs(diffMs) < 60000) return rtf.format(0, 'second');
+    if (Math.abs(diffMs) < 3600000) return rtf.format(Math.round(diffMs / 60000), 'minute');
+    if (Math.abs(diffMs) < 86400000) return rtf.format(Math.round(diffMs / 3600000), 'hour');
+    if (Math.abs(diffMs) < 604800000) return rtf.format(Math.round(diffMs / 86400000), 'day');
+
+    return date.toLocaleDateString();
+}

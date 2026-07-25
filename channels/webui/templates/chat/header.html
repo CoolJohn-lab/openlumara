@@ -29,6 +29,8 @@
             {% include 'svg/folder.svg' %}
         </button>
         <button class="btn" title="Clear chat" @click="
+            if (!confirm('Are you sure you want to clear this chat?')) { return }
+
             await simpleSocketSend({
                 'type': 'user_message',
                 'content': '/clear'

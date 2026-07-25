@@ -615,6 +615,7 @@ class Commands:
 
                 enabled_str = "\n".join(enabled)
                 return f"== modules with active prompts ==\n{enabled_str}"
+            
             case "export":
                 export_str = await self.channel.context.chat.export()
 

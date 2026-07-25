@@ -68,6 +68,18 @@ CHAT_STORE = {
         await this.reloadChat();
     },
 
+    async renameChat(chat_id, newTitle) {
+        await simpleApiPost(`/api/chat/rename/${chat_id}`, {title: newTitle});
+        await this.reloadChats();
+    },
+
+    async deleteChat(chat_id) {
+        if (!confirm("Are you sure you want to delete this chat?")) { return }
+
+        await simpleApiPost(`/api/chat/delete/${chat_id}`);
+        await this.reloadChats();
+    },
+
     async reloadChat() {
         stream = Alpine.store("stream");
 
@@ -88,9 +100,6 @@ CHAT_STORE = {
 
     async reloadChats() {
         this.chats = await simpleApiFetch('/api/chats');
-
-        // sort it in descending order
-        this.chats.reverse();
     },
 
     async reloadCategories() {
@@ -240,6 +249,49 @@ CHAT_STORE = {
         } catch (err) {
             console.error('Export failed:', err);
             // Optional: show a toast/notification to the user
+        }
+    },
+
+    /* ----------------------
+     * global search
+     * ----------------------- */
+    async searchGlobal(query, searchInContent = true, category = null) {
+        try {
+            const result = await simpleApiPost('/api/chats/search', {
+                query: query,
+                search_in_content: searchInContent,
+                category: category
+            });
+            
+            const queryLower = (query || '').toLowerCase();
+
+            // Priority sort:
+            // 1. Chats whose title contains the query come first
+            // 2. Within each group, sorted by updated descending (newest first)
+            result.sort((a, b) => {
+                const aMatches = (a.title || '').toLowerCase().includes(queryLower);
+                const bMatches = (b.title || '').toLowerCase().includes(queryLower);
+
+                // Primary: matching titles first
+                if (aMatches && !bMatches) return -1;
+                if (!aMatches && bMatches) return 1;
+
+                // Secondary: both match or both don't → sort by date descending
+                return (b.updated || '').localeCompare(a.updated || '');
+            });
+
+            return result;
+        } catch (err) {
+            console.error('Global search failed:', err);
+            return [];
+        }
+    },
+
+    async loadChatFromSearch(chatId) {
+        await this.loadChat(chatId);
+        Alpine.store('ui').closeModal();
+        if (Alpine.store('ui').isMobile) {
+            Alpine.store('ui').showSidebar = false;
         }
     },
 

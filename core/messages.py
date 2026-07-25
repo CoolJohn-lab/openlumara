@@ -30,7 +30,9 @@ class Messages:
         #                 self.data[index][key] = default_value
 
     async def save(self):
-        """just an alias for save() on the data"""
+        """saves data and updates the chat's timestamp"""
+
+        await self.chat.update_timestamp()
         return self.data.save()
 
     async def get(self, index = None):
@@ -114,7 +116,6 @@ class Messages:
 
         # return all messages up to (but not including) the target message
         new_messages = self.data[:index]
-        print(new_messages)
 
         self.data.load(new_messages)
         await self.save()

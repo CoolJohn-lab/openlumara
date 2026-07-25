@@ -143,6 +143,14 @@ class Chat:
         
         self.channel.log(self.channel.name, f"[MIGRATE] Migrated {len(new_chats)} chats for '{self.channel.name}'")
 
+    async def update_timestamp(self):
+        if self.current is None:
+            raise Exception("No chat is currently loaded!")
+
+        now = datetime.datetime.utcnow().isoformat()
+        self.data[self.current]["updated"] = now
+        await self.save()
+
     # ------------------
     # Chat Manipulation
     # ------------------
@@ -263,6 +271,9 @@ class Chat:
 
         return True
 
+    # ----------------
+    # Data Retrieval
+    # ----------------
     async def export(self):
         """exports the current chat to a file"""
 
@@ -324,33 +335,116 @@ class Chat:
         return "\n\n".join(turn_export)
 
 
-    def get(self, key = None, default = None):
-        if self.current is None:
+    def get(self, key = None, default = None, index = None):
+        if self.current is None and not index:
             raise Exception("No chat is currently loaded!")
+
+        if index is None:
+            index = self.current
 
         # return the chat itself if chat.get() is called without a key
         if key is None:
-            return self.data[self.current]
+            return self.data[index]
 
         # otherwise, get the chat's requested value
-        if key in self.data[self.current].keys():
-            return self.data[self.current][key]
+        if key in self.data[index].keys():
+            return self.data[index][key]
         else:
             return default
 
-    async def set(self, key, value):
-        if self.current is None:
+    async def search(self, query: str, max_results: int = 100):
+        """search across all chats for messages matching the query"""
+        import json
+        
+        results = []
+        query_lower = query.lower()
+        
+        found_chats = []
+        for chat_meta in self.data:
+            chat_id = chat_meta.get("id")
+            if not chat_id:
+                continue
+            
+            # Load messages from the history file
+            history_path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
+            if not os.path.exists(history_path):
+                continue
+            
+            try:
+                with open(history_path, 'r', encoding='utf-8') as f:
+                    messages = json.load(f)
+            except (json.JSONDecodeError, Exception):
+                continue
+            
+            # Search through messages
+            found_messages = []
+            for msg_index, message in enumerate(messages):
+                content = message.get("content", "")
+                if not content:
+                    continue
+                
+                # Handle multimodal content - extract text parts
+                if isinstance(content, list):
+                    content = " ".join(
+                        part.get("text", "") 
+                        for part in content 
+                        if isinstance(part, dict) and part.get("type") == "text"
+                    )
+                
+                if not isinstance(content, str) or not content.strip():
+                    continue
+                
+                # Case-insensitive substring search
+                if query_lower in content.lower():
+                    # Find the match position for snippet generation
+                    match_pos = content.lower().find(query_lower)
+                    
+                    # Generate snippet with context
+                    snippet_start = max(0, match_pos - 50)
+                    snippet_end = min(len(content), match_pos + len(query) + 50)
+                    snippet = content[snippet_start:snippet_end]
+                    
+                    # Add ellipsis if truncated
+                    if snippet_start > 0:
+                        snippet = "..." + snippet
+                    if snippet_end < len(content):
+                        snippet = snippet + "..."
+                    
+                    found_messages.append(snippet)
+            
+            if found_messages:
+                found_chats.append({
+                    "id": chat_meta.get("id"),
+                    "title": chat_meta.get("title"),
+                    "category": chat_meta.get("category"),
+                    "created": chat_meta.get("created"),
+                    "updated": chat_meta.get("updated"),
+                    "messages_found": len(found_messages),
+                    "message_snippets": found_messages
+                })
+
+                    
+            if len(found_chats) >= max_results:
+                return found_chats
+        
+        return found_chats
+
+    async def set(self, key, value, index = None):
+        if self.current is None and not index:
             raise Exception("No chat is currently loaded!")
 
-        if key in self.data[self.current].keys():
-            self.data[self.current][key] = value
+        if index is None:
+            index = self.current
+
+        if key in self.data[index].keys():
+            self.data[index][key] = value
             return True
         
         raise Exception(f"{key} is not a valid chat property")
 
     def get_all(self):
-        """returns all chats in the storage"""
-        return self.data
+        """returns all chats in the storage, sorted by updated date (most recent first)"""
+        return sorted(self.data, key=lambda c: c.get("updated", ""), reverse=True)
 
     def get_categories(self):
         collected_categories = []

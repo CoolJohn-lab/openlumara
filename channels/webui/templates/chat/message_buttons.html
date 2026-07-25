@@ -24,7 +24,7 @@
     <button @click="$store.chat.regenerateMessage(turnIndex)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/regenerate.svg' %}
     </button>
-    <button @click="$store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
+    <button @click="if (!confirm('Are you sure you want to delete this message?')) { return }; $store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/trash.svg' %}
     </button>
 </div>

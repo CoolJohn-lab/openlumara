@@ -87,6 +87,7 @@
             }
         }
     }
+
     .item:hover {
         background: var(--bg-tertiary);
         color: var(--text-primary);
@@ -176,15 +177,6 @@
                 text-overflow: ellipsis;
             }
 
-            .meta {
-                font-size: 0.75rem;
-                color: var(--text-muted);
-                display: flex;
-                margin-top: auto;
-                justify-content: space-between;
-                align-items: center;
-            }
-
             .tags {
                 display: flex;
                 flex-direction: row;
@@ -200,6 +192,126 @@
                     background-color: var(--bg-secondary);
                     text-overflow: ellipsis;
                     overflow: hidden;
+                }
+            }
+
+            .meta {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                display: flex;
+                margin-top: auto;
+                justify-content: space-between;
+                align-items: center;
+
+                .item-actions {
+                    display: flex;
+                    gap: 4px;
+                    opacity: 0;
+                    transition: opacity 0.2s ease;
+
+                    &:hover {
+                        opacity: 1;
+                    }
+                }
+
+                .action-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 24px;
+                    height: 24px;
+                    padding: 0;
+                    background: transparent;
+                    border: none;
+                    border-radius: var(--radius-sm);
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+
+                    svg {
+                        width: 12px;
+                        height: 12px;
+                    }
+
+                    &:hover {
+                        background: var(--bg-tertiary);
+                        color: var(--text-primary);
+                    }
+
+                    &.delete:hover {
+                        color: var(--error);
+                    }
+                }
+            }
+
+            .rename-container {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                width: 100%;
+                box-sizing: border-box;
+                margin-top: var(--gap);
+
+                .rename-input {
+                    flex: 1;
+                    min-width: 0;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--accent);
+                    border-radius: var(--radius-sm);
+                    color: var(--text-primary);
+                    padding: 4px 8px;
+                    font-size: 0.85rem;
+                    font-family: inherit;
+                    outline: none;
+                    transition: all 0.2s ease;
+                    box-sizing: border-box;
+                    height: 28px;
+
+                    &:focus {
+                        border-color: var(--accent);
+                        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+                    }
+                }
+
+                .rename-action-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 24px;
+                    height: 24px;
+                    padding: 0;
+                    border: none;
+                    border-radius: var(--radius-sm);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    flex-shrink: 0;
+
+                    svg {
+                        width: 12px;
+                        height: 12px;
+                    }
+
+                    &.save {
+                        background: var(--accent);
+                        color: var(--bg-primary);
+
+                        &:hover {
+                            filter: brightness(1.15);
+                            transform: scale(1.05);
+                        }
+                    }
+
+                    &.cancel {
+                        background: var(--bg-tertiary);
+                        color: var(--text-muted);
+                        border: 1px solid var(--border-color);
+
+                        &:hover {
+                            background: var(--bg-secondary);
+                            color: var(--text-primary);
+                            border-color: var(--accent);
+                        }
+                    }
                 }
             }
 

@@ -446,6 +446,27 @@ async def create_fastapi(channel):
         """Returns a list of all existing chat categories"""
         return api_result(channel.context.chat.get_categories(), True)
 
+    @app.post("/api/chats/search")
+    async def search_chats(request: fastapi.Request):
+        """Searches across all chats for messages matching a query"""
+        data = await request.json()
+        query = data.get("query", "").strip()
+        search_in_content = data.get("search_in_content", True)
+        category = data.get("category")
+
+        if not query:
+            return api_result([])
+
+        results = await channel.context.chat.search(query)
+
+        # filter by category if provided
+        if category and category != 'general':
+            results = [r for r in results if r.get('category') == category]
+        elif category == 'general':
+            results = [r for r in results if not r.get('category') or r.get('category') == 'general']
+
+        return api_result(results)
+
     @app.get("/api/chat/prompt")
     async def get_prompt():
         sysprompt = await channel.context.get(history=False)
@@ -459,6 +480,27 @@ async def create_fastapi(channel):
     async def chat_new():
         """Creates a new chat"""
         return api_result(success=await channel.context.chat.new())
+
+    @app.post("/api/chat/rename/{chat_id}")
+    async def chat_rename(chat_id: str, request: fastapi.Request):
+        """Renames a chat by its ID"""
+        try:
+            data = await request.json()
+            new_title = data.get('title', '').strip()
+            if not new_title:
+                return api_result("Title cannot be empty", success=False)
+            
+            # Find the index for this chat ID
+            index = channel.context.chat._find_index(chat_id)
+            if index is None:
+                return api_result("Chat not found", success=False)
+            
+            # Direct update without loading the chat
+            await channel.context.chat.set("title", new_title, index=index)
+            
+            return api_result(success=True)
+        except Exception as e:
+            return api_result(str(e), success=False)
 
     @app.post("/api/chat/delete/{chat_id}")
     async def chat_delete(chat_id: str):

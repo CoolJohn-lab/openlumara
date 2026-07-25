@@ -47,48 +47,7 @@ class Chats(core.module.Module):
         return self.result(f"chat organised!")
 
     async def _search(self, query: str, max_results: int = 20):
-        chats = await self.channel.context.chat.get_all()
-        if not chats:
-            return False
-
-        found_chats = []
-        count = 0
-        for index, chat in enumerate(chats):
-            # do not search within current chat
-            if index == 0 or index == len(chats)-1:
-                continue
-
-            if count > max_results:
-                break
-
-            # create a new chat dict so that we can include only the messages that contain the query
-            filtered_chat = {"id": chat.get("id"), "title": chat.get("title"), "tags": chat.get("tags", []), "messages": []}
-            found = False
-
-            # search within title
-            if chat.get("title", "").lower().strip().find(query.lower().strip()) != -1:
-                found = True
-
-            # search within content
-            # TODO: make this work with new chat structure
-            # for message in chat.get("messages", []):
-            #     content = message.get("content", "")
-            #     if not isinstance(content, str):
-            #         continue
-
-            #     if content.lower().find(query.lower().strip()) != -1:
-            #         filtered_chat["messages"].append({"role": message.get("role"), "content": message.get("content")})
-            #         found = True
-            #         break
-
-            if found:
-                count += 1
-                found_chats.append(filtered_chat)
-
-        if not found_chats:
-            return False
-
-        return found_chats
+        return await self.channel.context.chat.search(query, max_results)
 
     # command version
     @core.module.command("search")
@@ -112,7 +71,6 @@ class Chats(core.module.Module):
         if not found:
             return self.result("no results found")
         return self.result(found)
-
 
     async def _compress(self):
         await self.manager.channel.push("Compressing your chat history..")

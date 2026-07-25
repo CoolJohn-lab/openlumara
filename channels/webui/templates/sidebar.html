@@ -4,7 +4,9 @@
     >
     <div class="list">
         <template x-for="category in $store.chat.categories" :key="category">
-            <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="
+            <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory, 'disabled': $store.stream.state !== 'idle' && category !== $store.chat.selectedCategory}" @click="
+                if ($store.stream.state !== 'idle') { return }
+
                 $store.chat.selectCategory(category);
                 if ($store.ui.isMobile) {
                     await $store.ui.toggleMobileSidebarView();
@@ -56,25 +58,69 @@
             >
                 <!-- give selected chats a nice border via the CSS class -->
                 <div
-                    x-data="{ active: false }"
+                    x-data="{ 
+                        active: false, 
+                        renaming: false, 
+                        renameValue: ''
+                    }"
                     :id="`chat-${chat.id}`"
                     class="item"
-                    :class="{'active': chat.id === $store.chat.selectedChat, 'disabled': $store.stream.state !== 'idle' && chat.id !== $store.chat.selectedChat}"
+                    :class="{
+                        'active': chat.id === $store.chat.selectedChat, 
+                        'disabled': $store.stream.state !== 'idle' && chat.id !== $store.chat.selectedChat,
+                        'renaming': renaming
+                    }"
                     @click="
-                    active = !active;
-                    $store.chat.loadChat(chat.id);
-                    if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+                        if (!renaming) {
+                            active = !active;
+                            $store.chat.loadChat(chat.id);
+                            if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+                        }
                     "
                     x-init="
                         $nextTick(() => {
-                            // autoscroll to the selected chat
                             if (chat.id === $store.chat.selectedChat) {
                                 $el.scrollIntoView({ behavior: 'smooth' });
                             }
                         })
                     "
                 >
-                    <span class="title" x-text="chat.title || 'New chat'"></span>
+                    <template x-if="!renaming">
+                        <span class="title" x-text="chat.title || 'New chat'"></span>
+                    </template>
+                    <template x-if="renaming">
+                        <div class="rename-container">
+                            <input 
+                                x-ref="renameInput"
+                                type="text" 
+                                x-model="renameValue" 
+                                @keydown.enter="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''"
+                                @keydown.escape="renaming = false; renameValue = ''"
+                                @blur="setTimeout(() => { if (renaming) { renaming = false; renameValue = ''; } }, 150)"
+                                class="rename-input"
+                            >
+                            <button @click="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''" class="rename-action-btn save" title="Save">
+                                {% include 'svg/checkmark.svg' %}
+                            </button>
+                            <button @click="renaming = false; renameValue = ''" class="rename-action-btn cancel" title="Cancel">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                    </template>
+                    
+                    <div class="meta">
+                        <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
+                        
+                        <div class="item-actions" @click.stop>
+                            <button class="action-btn" @click="renaming = true; renameValue = chat.title; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })" title="Rename">
+                                {% include 'svg/edit.svg' %}
+                            </button>
+                            <button class="action-btn delete" @click="$store.chat.deleteChat(chat.id)" title="Delete">
+                                {% include 'svg/trash.svg' %}
+                            </button>
+                        </div>
+                    </div>
+                    
                     <ul class="tags">
                         <template x-for="tag in chat.tags.slice(0,3)" :key="tag">
                             <li x-text="tag" class="tag"></li>
