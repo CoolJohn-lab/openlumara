@@ -88,7 +88,7 @@
     </template>
 
     <!-- typing indicator -->
-    <template x-if="$store.stream.state === 'received'">
+    <template x-if="$store.stream.state === 'message_sending' || $store.stream.state === 'message_received'">
         <div class="typing-indicator" id="typing" aria-label="AI is typing" x-ignore>
             <span></span><span></span><span></span>
         </div>

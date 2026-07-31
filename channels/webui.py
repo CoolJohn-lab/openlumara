@@ -909,7 +909,6 @@ class WebSocketManager:
         self.active_connections = []
 
         self.active_stream_task = None
-        self.active_chat_id = None
         self.webui_ready = False
 
     async def connect(self, websocket: fastapi.WebSocket):
@@ -955,74 +954,73 @@ class WebSocketManager:
     async def _stream_task(self, message: str, index, files: list = None):
         user_message_confirmed = False
 
-        async for partial in self.channel.turncollector.group_stream(
-                self.channel.send_stream(
-                    message=message,
-                    files=files,
-                    commands_authorized=self.channel.config.get("allow_admin_commands")
-                )
-            ):
-            payload = serialize_for_json(partial)
+        try:
+            async for partial in self.channel.turncollector.group_stream(
+                    self.channel.send_stream(
+                        message=message,
+                        files=files,
+                        commands_authorized=self.channel.config.get("allow_admin_commands")
+                    )
+                ):
+                payload = serialize_for_json(partial)
 
-            if partial.get("type") == "token":
-                token = partial.get("content")
-                token_type = token.get("type")
-                match token_type:
-                    case "user_message":
-                        try:
-                            user_msg_payload = token.copy()
-                            user_msg_payload['index'] = index
-                            await self.broadcast({
-                                "type": "user_message_added",
-                                "message": user_msg_payload,
-                            })
-                        except Exception as e:
-                            self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
-                            return
-                    case "error":
-                        # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
-                        await self.broadcast({
-                            "type": "user_message_confirmed",
-                            "index": index
-                        })
-                        await self.broadcast({
-                            "type": "stream_complete",
-                            "buffer": []
-                        })
-                        await self.broadcast({
-                            "type": "sync"
-                        })
-                        return
-                    case _:
-                        if not user_message_confirmed:
-                            user_message_confirmed = True
+                if partial.get("type") == "token":
+                    token = partial.get("content")
+                    token_type = token.get("type")
+                    match token_type:
+                        case "user_message":
+                            try:
+                                user_msg_payload = token.copy()
+                                user_msg_payload['index'] = index
+                                await self.broadcast({
+                                    "type": "user_message_added",
+                                    "message": user_msg_payload,
+                                })
+                            except Exception as e:
+                                self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
+                                return
+                        case "error":
+                            # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
                             await self.broadcast({
                                 "type": "user_message_confirmed",
                                 "index": index
                             })
+                            await self.broadcast({
+                                "type": "stream_complete",
+                                "buffer": []
+                            })
+                            await self.broadcast({
+                                "type": "sync"
+                            })
+                            return
+                        case _:
+                            if not user_message_confirmed:
+                                user_message_confirmed = True
+                                await self.broadcast({
+                                    "type": "user_message_confirmed",
+                                    "index": index
+                                })
 
-                        await self.broadcast({
-                            "type": "token",
-                            "content": token
-                        })
+                            await self.broadcast({
+                                "type": "token",
+                                "content": token
+                            })
 
-            elif partial.get("type") == "turn":
-                await self.broadcast({
-                    "type": "turn_stream",
-                    "turns": partial.get("content")
-                })
-
-        await self.broadcast({
-            "type": "stream_complete"
-        })
-
-        self.active_chat_id = None
+                elif partial.get("type") == "turn":
+                    await self.broadcast({
+                        "type": "turn_stream",
+                        "turns": partial.get("content")
+                    })
+        finally:
+            # always finalize the stream, no matter what
+            await self.broadcast({
+                "type": "stream_complete"
+            })
 
     async def start_stream(self, channel, chat_id: str, message: str, files: list = None):
         if self.active_stream_task and not self.active_stream_task.done():
             self.active_stream_task.cancel()
 
-        self.active_chat_id = chat_id
         next_index = len(await channel.context.chat.messages.get())
 
         try:
@@ -1031,5 +1029,4 @@ class WebSocketManager:
             pass
         except Exception as e:
             channel.log(channel.name, f"Background stream error: {core.detail_error(e)}")
-            self.active_chat_id = None
 

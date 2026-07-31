@@ -108,10 +108,12 @@ async function handleWebSocketMessage(data) {
 
             // force scroll to bottom
             await ui.forceScrollToBottom();
+
+            stream.state = 'message_sending';
             break;
 
         case "user_message_confirmed":
-            stream.state = 'received';
+            stream.state = 'message_received';
             break;
 
         case "turn_stream":
