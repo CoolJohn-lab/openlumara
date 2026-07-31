@@ -1,6 +1,5 @@
 import core
 import random
-import regex
 
 class Lists(core.module.Module):
     """
@@ -39,7 +38,7 @@ class Lists(core.module.Module):
         for cat, items in pinned_by_cat.items():
             output += f"## {cat}\n"
             for name, lst_items in items:
-                output += f"### {name}\n" + "\n".join(f"{i+1}. {it}" for i, it in enumerate(lst_items)) + "\n"
+                output += f"### {name}\n" + "\n".join(f"- {it}" for it in lst_items) + "\n"
         if unpinned_by_cat:
             output += "---\nlists that aren't pinned:\n"
             for cat, names in unpinned_by_cat.items():
@@ -147,20 +146,11 @@ class Lists(core.module.Module):
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
-        output = ""
-        for index, list_item in enumerate(self.data[category][list_name].get("items")):
-                    output += f"{index+1}. {list_item}\n"
-
-        return self.result(output)
+        return self.result(self.data[category][list_name].get("items"))
 
     def _find_item(self, items: list, starts_with: str):
-        # Remove leading number prefix like "1. ", "2. ", etc. from the search term
-        clean_search = regex.sub(r'^\d+\.\s*', '', starts_with.strip().lower())
-
         for index, item in enumerate(items):
-            # Also strip leading number from the item for comparison
-            clean_item = regex.sub(r'^\d+\.\s*', '', item.strip().lower())
-            if clean_item.startswith(clean_search):
+            if item.strip().lower().startswith(starts_with.strip().lower()):
                 return index
         return None
 
