@@ -918,7 +918,7 @@ class WebSocketManager:
 
         asyncio.create_task(self.queue_ready_signal())
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: fastapi.WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
 
