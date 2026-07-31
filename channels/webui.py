@@ -476,7 +476,7 @@ async def create_fastapi(channel):
 
     @app.get("/api/chat/prompt")
     async def get_prompt():
-        sysprompt = await channel.context.get(history=False)
+        sysprompt = await channel.context.get(system_prompt=True, end_prompt=False, history=False)
         if isinstance(sysprompt, core.api.APIError):
             return api_result(sysprompt, success=False)
 
