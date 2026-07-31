@@ -94,6 +94,7 @@ input:checked + .theme-slider::before {
 .theme-btn.active {
     border-color: var(--accent);
     background: var(--button-bg);
+    color: var(--button-text);
     box-shadow: 0 0 12px var(--accent-glow);
 }
 
