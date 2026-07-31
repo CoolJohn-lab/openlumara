@@ -35,11 +35,11 @@ document.addEventListener('alpine:init', async () => {
     // check if we're on a phone
     await Alpine.store('ui').init();
 
-    // fetch current chat
-    await Alpine.store('chat').load();
-
     // fetch any relevant system data (like system logs, max context, etc)
     await Alpine.store('system').loadData();
+
+    // fetch current chat
+    await Alpine.store('chat').load();
 
     // do the initial scroll to bottom
     requestAnimationFrame(() => {

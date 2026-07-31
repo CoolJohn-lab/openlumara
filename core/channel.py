@@ -556,6 +556,7 @@ class Channel:
         """sends a message to the AI from within the current channel, streaming version"""
 
         # preprocessing (API connection logic, command processing, user message module hooks, etc)
+        # this also adds the user's message to context, so we don't need to do that in this function
         processed = await self._send_preprocess(message, files, commands_authorized)
 
         match processed["type"]:
@@ -588,22 +589,12 @@ class Channel:
         
         # estimate tokens used for user message
         user_message_token_estimation = 0
-        if self.context.using_api_token_data:
-            # if using API token count
-            user_msg_tokens = await self.context.count_tokens([{"role": "user", "content": user_message}])
-            user_message_token_estimation = self.context.chat.get("token_usage", 0)+user_msg_tokens
-
-            # add to existing API token count
-            await self.context.chat.set("token_usage", user_message_token_estimation)
-        else:
-            # just fully estimate
-            try:
-                user_message_token_estimation = await self.context.get_total_tokens()
-            except Exception as e:
-                self.log_error("Error while trying to estimate token use", e)
-                yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
-                # abort
-                return
+        try:
+            user_message_token_estimation = await self.context.get_total_tokens()
+        except Exception as e:
+            self.log_error("Error while trying to estimate token use", e)
+            yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
+            return
 
         # yield so it updates throughout all channels that display token count
         yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
