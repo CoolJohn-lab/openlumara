@@ -500,7 +500,6 @@ class APIClient():
             self.cancel_request = False
             raise  # let callers handle cancellation
         except Exception as e:
-            self.manager.log_error("error while sending request to AI", e)
             yield {"type": "error", "content": f"While sending request to AI: {core.detail_error(e)}"}
 
     async def cancel(self):
@@ -563,8 +562,14 @@ class APIClient():
         if not response:
             return
 
+        response_started = False
         try:
             async for chunk in response:
+                if not response_started:
+                    # mark it as started so that we can detect if the API has returned a blank message
+                    # (for example due to an error the inference server, i.e. llamacpp, failed to send)
+                    response_started = True
+
                 if self.cancel_request:
                     if hasattr(response, "close"):
                         # support closing
@@ -572,7 +577,7 @@ class APIClient():
                     raise asyncio.CancelledError("Request cancelled")
 
                 # uncomment if trying to see token stream chunks
-                # print(chunk)
+                #print(chunk)
 
                 if hasattr(chunk, 'prompt_progress') and chunk.prompt_progress is not None:
                     yield {
@@ -697,6 +702,11 @@ class APIClient():
         except Exception as e:
             #self.manager.log_error("error while receiving response from AI", e)
             raise e # Re-raise so send_stream can catch it and yield the error type
+
+        if not response_started:
+            # this means the inference server (such as llamacpp) failed to report an error
+            # for user friendliness, we just display a message that explains what happened
+            raise Exception("The API returned a blank response. This likely means an error happened on the API end, but that API failed to report the error. Check your AI server's logs if you're using local AI, or if not, contact your cloud AI service. Also, try turning off `Use Developer Role` in the api settings, as some models don't support it.")
 
     async def list_models(self):
         if not self.connected:

@@ -614,21 +614,21 @@ class Channel:
 
         try:
             async for token in stream:
-                # always yield the token to the caller
-                yield token
-
                 token_type = token.get("type")
 
                 # handle any errors
                 if token_type == "error":
                     self.log(self.name, f"Error: {token.get('content')}")
-                    yield token
 
                     # add the content that has been accumulated so far, so that we don't lose incomplete messages
                     assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
                     await self.context.chat.messages.add(assistant_message)
 
+                    yield await self.throw_stream_error(token.get("content"))
                     return
+
+                # always yield the token to the caller
+                yield token
 
                 if token_type == "content":
                     # this is a normal piece of streamed text
@@ -676,6 +676,8 @@ class Channel:
             else:
                 # otherwise, we actually want the normal assistant message adding path to be taken
                 pass
+        except Exception as e:
+            yield await self.throw_stream_error(str(e))
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
