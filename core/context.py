@@ -190,6 +190,14 @@ class Context:
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
         if current_tokens > effective_max_tokens and messages:
+            # Reserve tokens for the last user message so it always fits
+            reserved_tokens = 0
+            if messages and messages[-1].get("role") == "user":
+                reserved_tokens = await self.count_tokens([messages[-1]])
+            
+            # Reduce the effective max by the reserved amount
+            effective_max_with_reserve = effective_max_tokens - reserved_tokens
+            
             # Binary search: find the minimum number of messages to remove from the front
             lo, hi = 0, len(messages)
             best_trim = len(messages)  # worst case: remove everything
@@ -198,7 +206,7 @@ class Context:
                 mid = (lo + hi) // 2
                 trimmed = messages[mid:]
                 candidate_context = system_msg + trimmed + end_msg
-                tokens = tool_tokens + await self.count_tokens(candidate_context)
+                tokens = tool_tokens + await self.count_tokens(candidate_context) + reserved_tokens
 
                 if tokens <= effective_max_tokens:
                     best_trim = mid
@@ -208,7 +216,7 @@ class Context:
 
             messages = messages[best_trim:]
             full_context = system_msg + messages + end_msg
-            current_tokens = tool_tokens + await self.count_tokens(full_context)
+            current_tokens = tool_tokens + await self.count_tokens(full_context) + reserved_tokens
 
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.

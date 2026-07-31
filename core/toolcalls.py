@@ -245,18 +245,10 @@ class ToolcallManager:
                 elif token_type in ["tool_call_delta", "tool", "tool_calls", "prompt_progress", "timings"]:
                     yield token
 
-                if token_type == "token_usage":
-                    usage = token.get("content")
-                    if usage is not None:
-                        # set the flag so that token counting is always using API data
-                        if not self.channel.context.using_api_token_data:
-                            self.channel.context.using_api_token_data = True
-
-                        await self.channel.context.chat.set("token_usage", usage)
-                        # yield it to the frontend so the token bar updates in real-time
-                        yield token
-
                 if token_type == "tool_calls":
+                    # re-calculate current token use and yield it
+                    yield {"type": "token_usage", "content": await self.channel.context.get_total_tokens()}
+
                     had_recursive_call = True
                     toolcall_request = await self._build_recursive_request(token, final_content, final_reasoning)
 
