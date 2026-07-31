@@ -171,7 +171,7 @@ class Lists(core.module.Module):
         target_list = self.data[category][list_name]
 
         found_index = self._find_item(target_list["items"], item_starts_with)
-        if not found_index:
+        if found_index is None:
             return self.result("could not find that list item", False)
 
         target_list["items"][found_index] = item_content
@@ -186,7 +186,7 @@ class Lists(core.module.Module):
         target_list = self.data[category][list_name]
 
         found_index = self._find_item(target_list["items"], item_starts_with)
-        if not found_index:
+        if found_index is None:
             return self.result("could not find that list item", False)
 
         target_list["items"].pop(found_index)
