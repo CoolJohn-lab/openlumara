@@ -292,6 +292,14 @@ class ToolcallManager:
                     if push:
                         await self.channel.push(final_msg)
 
+        except asyncio.CancelledError:
+            # cancellation during recursive toolcalling - commit the final message
+            if final_content or final_reasoning:
+                final_msg = {"role": "assistant", "content": "".join(final_content)}
+                if final_reasoning:
+                    final_msg["reasoning_content"] = "".join(final_reasoning)
+                await self.channel.context.chat.messages.add(final_msg)
+            raise
         except Exception as e:
             self.channel.log_error(f"Error while handling tool calls", e)
             await self.channel.push(

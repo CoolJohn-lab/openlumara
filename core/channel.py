@@ -621,55 +621,63 @@ class Channel:
             yield await self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
             return
 
-        async for token in stream:
-            # always yield the token to the caller
-            yield token
-
-            token_type = token.get("type")
-
-            # handle any errors
-            if token_type == "error":
-                self.log(self.name, f"Error: {token.get('content')}")
+        try:
+            async for token in stream:
+                # always yield the token to the caller
                 yield token
 
-                # add the content that has been accumulated so far, so that we don't lose incomplete messages
+                token_type = token.get("type")
+
+                # handle any errors
+                if token_type == "error":
+                    self.log(self.name, f"Error: {token.get('content')}")
+                    yield token
+
+                    # add the content that has been accumulated so far, so that we don't lose incomplete messages
+                    assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+                    await self.context.chat.messages.add(assistant_message)
+
+                    return
+
+                if token_type == "content":
+                    # this is a normal piece of streamed text
+                    final_content.append(token.get("content"))
+                elif token_type == "reasoning":
+                    final_reasoning.append(token.get("content"))
+                elif token_type == "tool_call_delta":
+                    # yay toolcall arg streaming!
+                    pass
+                elif token_type == "tool_calls":
+                    tool_calls_occurred = True
+
+                    toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
+
+                    # we add the accumulated content tokens so far to the assistant_content argument
+                    async for sub_token in self.tc_manager.process(toolcall_request):
+                        yield sub_token
+                    # tc_manager.process() will loop until the AI no longer deems tool calls necessary
+                elif token_type == "tool":
+                    # this is a toolcall response
+                    pass
+                elif token_type == "token_usage":
+                    # this is the final token usage count, usually emitted at the end of the stream
+                    token_usage = token.get("content")
+                    if isinstance(token_usage, int):
+                        # set the flag so that token counting is always using API data
+                        if not self.context.using_api_token_data:
+                            self.context.using_api_token_data = True
+
+                        # cache this so chat.get_token_usage() returns this value
+                        await self.context.chat.set("token_usage", token_usage)
+
+                        fetched_token_usage = True
+        except asyncio.CancelledError:
+            # stream was cancelled - freeze and commit whatever state we have
+            if final_content and not tool_calls_occurred:
+                # no tool calls, just add the assistant message with accumulated content
                 assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-                await self.context.chat.messages.add(assistant_message)
-
-                return
-
-            if token_type == "content":
-                # this is a normal piece of streamed text
-                final_content.append(token.get("content"))
-            elif token_type == "reasoning":
-                final_reasoning.append(token.get("content"))
-            elif token_type == "tool_call_delta":
-                # yay toolcall arg streaming!
-                pass
-            elif token_type == "tool_calls":
-                tool_calls_occurred = True
-
-                toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
-
-                # we add the accumulated content tokens so far to the assistant_content argument
-                async for sub_token in self.tc_manager.process(toolcall_request):
-                    yield sub_token
-                # tc_manager.process() will loop until the AI no longer deems tool calls necessary
-            elif token_type == "tool":
-                # this is a toolcall response
-                pass
-            elif token_type == "token_usage":
-                # this is the final token usage count, usually emitted at the end of the stream
-                token_usage = token.get("content")
-                if isinstance(token_usage, int):
-                    # set the flag so that token counting is always using API data
-                    if not self.context.using_api_token_data:
-                        self.context.using_api_token_data = True
-
-                    # cache this so chat.get_token_usage() returns this value
-                    await self.context.chat.set("token_usage", token_usage)
-
-                    fetched_token_usage = True
+                await self._send_postprocess(assistant_message)
+            raise
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
