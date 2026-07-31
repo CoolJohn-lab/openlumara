@@ -489,13 +489,16 @@ class APIClient():
             async for token in self._recv_stream(response):
                 if self.cancel_request:
                     # cancel the entire stream
-                    break
+                    raise asyncio.CancelledError("Request cancelled")
 
                 if core.debug_stream:
                     self.manager.log("debug:stream", json.dumps(token, ensure_ascii=True))
 
                 # let the channel calling send_stream() handle token processing
                 yield token
+        except asyncio.CancelledError:
+            self.cancel_request = False
+            raise  # let callers handle cancellation
         except Exception as e:
             self.manager.log_error("error while sending request to AI", e)
             yield {"type": "error", "content": f"While sending request to AI: {core.detail_error(e)}"}
@@ -503,12 +506,15 @@ class APIClient():
     async def cancel(self):
         """cancel a request that's been sent to the AI"""
         self.cancel_request = True
+
+        # wait for the cancellation to complete
+        while self.cancel_request:
+            await asyncio.sleep(0.05)
+
         return True
 
     async def _recv(self, response, use_tools=True):
         """takes a response object and extracts the message from it, handling tool calls if needed"""
-
-        final_content = None
 
         try:
             # normal non-streaming mode
@@ -548,8 +554,6 @@ class APIClient():
         """Takes a response object and extracts the message from it, handling tool calls if needed. Streaming version."""
         final_tool_calls = []
         tool_call_buffer = {}
-        tokens = []
-        reasoning_tokens = []
 
         token_usage = None
         total_prompt_tokens = 0
@@ -565,7 +569,7 @@ class APIClient():
                     if hasattr(response, "close"):
                         # support closing
                         await response.close()
-                    return
+                    raise asyncio.CancelledError("Request cancelled")
 
                 # uncomment if trying to see token stream chunks
                 # print(chunk)
@@ -588,7 +592,6 @@ class APIClient():
 
                     # handle content token streaming
                     if streamed_token.content:
-                        tokens.append(streamed_token.content)
                         content_yield = {"type": "content", "content": streamed_token.content}
 
                     # handle reasoning content streaming
@@ -596,7 +599,6 @@ class APIClient():
                                 getattr(streamed_token, "reasoning", None)
 
                     if reason_part:
-                        reasoning_tokens.append(reason_part)
                         content_yield = {"type": "reasoning", "content": reason_part}
 
                     # add timing data to the yielded token
@@ -659,6 +661,7 @@ class APIClient():
                                         "type": "tool_call_delta",
                                         "tool_calls": [tool_call_buffer[index].model_dump()]
                                     }
+                                    # we use model_dump() so that it converts the pydantic models to python dicts that can be json serialized
 
                 # if response has usage data, save it so we can use it to show to the user and to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:
