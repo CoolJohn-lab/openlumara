@@ -50,6 +50,14 @@ THEME_STORE = {
             root.style.setProperty(varName, value);
         }
 
+        // Switch code syntax highlighting theme based on mode
+        const codeThemeLink = document.getElementById('code-theme');
+        if (codeThemeLink) {
+            codeThemeLink.href = mode === 'dark'
+                ? '/assets/css/code-themes/github-dark.css'
+                : '/assets/css/code-themes/github-light.css';
+        }
+
         // Update state
         this.family = family;
         this.mode = mode;

@@ -46,6 +46,9 @@
         <!-- DOMPurify (XSS protection) -->
         <script src="{{ url_for('assets', path='js/libs/purify.min.js') }}"></script>
 
+        <!-- highlight.js (code syntax highlighter) -->
+        <script src="{{ url_for('assets', path='js/libs/highlight.min.js') }}"></script>
+
         <!-- marked (markdown support) -->
         <script src="{{ url_for('assets', path='js/libs/marked.min.js') }}"></script>
 
@@ -58,6 +61,8 @@
         {% for file in css_files %}
         <link rel="stylesheet" href="{{ url_for('assets', path='css/'+file) }}" />
         {% endfor %}
+
+        <link rel="stylesheet" id="code-theme" href="{{ url_for('assets', path='css/code-themes/github-dark.css') }}">
     </head>
     <body>
         <!-- 

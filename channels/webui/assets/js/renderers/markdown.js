@@ -1,13 +1,26 @@
+// create a temporary div that gets used to syntax highlight
+const _tempHighlightDiv = document.createElement('div');
+
 function renderMarkdown(text) {
-    // handle undefined or null safely
     if (!text) return '';
 
-    // parse markdown
-    const rendered = marked.parse(text);
+    // parse the markdown to HTML
+    let html = marked.parse(text);
 
-    // and protect against XSS
-    const clean = DOMPurify.sanitize(rendered);
+    // syntax hightlighting
+    if (typeof hljs !== 'undefined') {
+        _tempHighlightDiv.innerHTML = html;
+
+        _tempHighlightDiv.querySelectorAll('pre code').forEach((block) => {
+            const lang = block.className.replace('language-', '') || undefined;
+            hljs.highlightElement(block);
+        });
+
+        html = _tempHighlightDiv.innerHTML;
+    }
+
+    // protect against XSS
+    const clean = DOMPurify.sanitize(html);
 
     return clean;
 }
-

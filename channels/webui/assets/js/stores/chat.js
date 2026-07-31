@@ -131,7 +131,7 @@ CHAT_STORE = {
             return;
         }
 
-        Alpine.store("stream").state = "sending";
+        Alpine.store("stream").state = "message_sending";
         await this.clearInput();
 
         // handle any files the user may have attached
@@ -197,6 +197,8 @@ CHAT_STORE = {
                 "type": "message_regenerate",
                 "index": turn.first_message_index
             });
+
+            Alpine.store('stream').state = 'message_sending';
         });
     },
 

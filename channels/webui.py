@@ -333,7 +333,7 @@ async def create_fastapi(channel):
     @app.get("/")
     async def root(request: fastapi.Request):
         """The main page. This returns HTML, not JSON"""
-        css_files = get_recursive_assets(os.path.join(channel.assets_path, "css"), "css")
+        css_files = get_recursive_assets(os.path.join(channel.assets_path, "css"), "css", skip=["code-themes"])
         alpine_stores = os.listdir(os.path.join(channel.assets_path, "js", "stores"))
         js_utils = os.listdir(os.path.join(channel.assets_path, "js", "utils"))
         js_files = get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["init.js", "stores", "libs", "utils"])
@@ -984,10 +984,6 @@ class WebSocketManager:
                             await self.broadcast({
                                 "type": "user_message_confirmed",
                                 "index": index
-                            })
-                            await self.broadcast({
-                                "type": "stream_complete",
-                                "buffer": []
                             })
                             await self.broadcast({
                                 "type": "sync"

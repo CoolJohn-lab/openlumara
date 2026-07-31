@@ -268,11 +268,12 @@ async function handleWebSocketMessage(data) {
             // finalize the stream
             AudioManager.play("completion");
             await ui.scrollToBottom();
-            stream.state = 'idle';
 
             // and finally, sync back up with the backend
             await chat.reloadChat();
             await chat.reloadChats();
+
+            stream.state = 'idle';
 
             break;
     }
