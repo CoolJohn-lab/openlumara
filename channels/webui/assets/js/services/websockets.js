@@ -178,6 +178,9 @@ async function handleWebSocketMessage(data) {
             sys = Alpine.store("system")
             sys.running = true;
             sys.restarting = false;
+
+            // reload the system data from the backend
+            await sys.loadData();
             break;
 
         case "shutdown":
