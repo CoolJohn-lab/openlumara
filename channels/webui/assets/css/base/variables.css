@@ -10,14 +10,13 @@
     
     /* === MESSAGE BACKGROUNDS === */
     --bg-message-user: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
-    --bg-message-ai: #1a1a1a;
-    --bg-message-announce: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+    --bg-message-ai: var(--bg-tertiary);
     --bg-message-command: linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%);
     --bg-message-command-response: linear-gradient(135deg, #1a1a2a 0%, #0f0f1f 100%);
     
     /* === INPUT & CODE === */
     --bg-input: #161616;
-    --bg-code: #0a0a0a;
+    --bg-code: var(--bg-primary);
     --bg-sidebar: #0d0d0d;
     
     /* === BORDERS === */
@@ -51,6 +50,7 @@
     
     /* === BUTTONS === */
     --button-bg: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    --button-text: var(--text-primary);
     --button-hover: linear-gradient(135deg, #444444 0%, #333333 100%);
     --button-stop: linear-gradient(135deg, #5a2a2a 0%, #3a1a1a 100%);
     

@@ -73,7 +73,7 @@
 
         &:hover {
             background: var(--button-bg);
-            color: var(--text-primary);
+            color: var(--button-text);
             border-color: var(--accent);
         }
 
@@ -183,7 +183,7 @@
 
     .cancel {
         background: var(--button-bg);
-        color: var(--text-primary);
+        color: var(--button-text);
 
         &:hover {
             background: var(--button-hover);
@@ -238,7 +238,7 @@
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
         background: var(--button-bg);
-        color: var(--text-primary);
+        color: var(--button-text);
         font-size: 14px;
         font-weight: 500;
         font-family: var(--font-primary);

@@ -301,7 +301,14 @@
 
         &:hover {
             background: var(--button-bg);
+            color: var(--button-text);
             border-color: var(--accent);
+
+            .info {
+                .description {
+                    color: var(--button-text);
+                }
+            }
         }
 
         &.disabled {
@@ -330,7 +337,6 @@
                 font-family: var(--font-primary);
                 cursor: pointer;
                 text-align: left;
-                transition: color 0.15s;
             }
 
             .description {

@@ -40,7 +40,8 @@ THEME_STORE = {
         const root = document.documentElement;
 
         // Reset to base vars
-        for (const [varName, value] of Object.entries(BASE_THEME_VARS)) {
+        const baseTheme = window.themes['base'][mode] || window.themes['base']['dark'];
+        for (const [varName, value] of Object.entries(baseTheme)) {
             root.style.setProperty(varName, value);
         }
 
@@ -100,6 +101,8 @@ THEME_STORE = {
         const themes = window.themes || {};
         
         for (const family in themes) {
+            if (family === 'base') continue;  // hide base from UI
+
             const themeData = themes[family];
             families[family] = {
                 dark: !!themeData.dark,
@@ -110,15 +113,3 @@ THEME_STORE = {
         return families;
     }
 }
-
-// Base theme variables for reset
-const BASE_THEME_VARS = {
-    '--radius-sm': '4px',
-    '--radius-md': '8px',
-    '--radius-lg': '12px',
-    '--radius-xl': '16px',
-    '--bg-pattern': 'none',
-    '--bg-pattern-size': '24px 24px',
-    '--message-decoration': 'none',
-    '--avatar-shape': '50%'
-};
