@@ -279,8 +279,11 @@ class Commands:
             return None, None, []
         
         try:
-            cmd = shlex.split(message_content[len(cmd_prefix):])
-            args = cmd[1:]
+            cmd_full = shlex.split(message_content[len(cmd_prefix):])
+            args = cmd_full[1:]
+
+            cmd = cmd_full[0] if len(cmd_full)>0 else ""
+
             return (cmd_prefix, cmd, args)
         except ValueError as e:
             return None, None, []
@@ -289,27 +292,27 @@ class Commands:
         """wrapper around the real _process_input, handles insertion of context"""
         cmd_prefix, cmd, args = await self._extract_cmd(content)
 
-        if cmd_prefix is None or cmd is None:
+        if cmd_prefix is None:
             return False
+
+        # insert /command into context so that it gets properly tracked and displayed
+        use_temporary = self._check_if_temporary(cmd)
+
+        args_display = ""
+        if args:
+            args_display += " "
+            args_display += " ".join(args)
+        await self.channel.context.chat.messages.add({"role": "user", "content": f"{cmd_prefix}{cmd}{args_display}"}, cmd=True, ghost=use_temporary)
 
         if len(cmd) <= 0:
             raise core.exceptions.UnauthorizedException("Command was somehow zero length. Aborting for security reasons.")
 
-        if not authorized and cmd[0] not in self.PUBLIC_COMMANDS:
+        if not authorized and cmd not in self.PUBLIC_COMMANDS:
             raise core.exceptions.UnauthorizedException("You are not authorized to run admin commands.")
 
         # treat message as normal if it's not a command
         if cmd is None or not content.startswith(cmd_prefix):
             return False
-
-        use_temporary = self._check_if_temporary(cmd[0])
-
-        # insert /command into context so that it gets properly tracked and displayed
-        args_display = ""
-        if args:
-            args_display += " "
-            args_display += " ".join(args)
-        await self.channel.context.chat.messages.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
 
         result = await self._process_input(content)
 
@@ -323,7 +326,7 @@ class Commands:
 
         cmd_prefix, cmd, args = await self._extract_cmd(content)
 
-        match cmd[0]:
+        match cmd:
             # case "undo":
             #     self.channel.manager.API._messages.pop()
             #     self.channel.manager.API._messages.pop()
@@ -645,7 +648,7 @@ class Commands:
                 # handle module commands by using their decorated methods
 
                 if self.channel.manager.modules:
-                    cmd_lookup = cmd[0].lower().strip()
+                    cmd_lookup = cmd.lower().strip()
 
                     # See if this command exists in the command registry
                     if cmd_lookup in core.module._command_registry:

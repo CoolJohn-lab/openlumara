@@ -575,10 +575,6 @@ class Channel:
             case "error":
                 # immediately yield the user message
                 yield {"type": "user_message", "content": message, "is_cmd": True}
-
-                # the way process_input() works means it doesn't add the user's command message in case of an error.
-                # so we do it here
-                await self.context.chat.messages.add({"role": "user", "content": message, "is_cmd": True})
                 yield await self.throw_stream_error(processed["content"])
                 return
 
