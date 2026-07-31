@@ -598,7 +598,7 @@ class Channel:
         else:
             # just fully estimate
             try:
-                user_message_token_estimation = await self.context.count_tokens()
+                user_message_token_estimation = await self.context.get_total_tokens()
             except Exception as e:
                 self.log_error("Error while trying to estimate token use", e)
                 yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
@@ -670,7 +670,7 @@ class Channel:
                         if not self.context.using_api_token_data:
                             self.context.using_api_token_data = True
 
-                        # cache this so chat.get_token_usage() returns this value
+                        # cache this in the chat's metadata
                         await self.context.chat.set("token_usage", token_usage)
 
                         fetched_token_usage = True
@@ -688,7 +688,7 @@ class Channel:
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.count_tokens(), "source": "estimation"}
+            yield {"type": "token_usage", "content": await self.context.get_total_tokens(), "source": "estimation"}
 
         # and finally, once the stream has completed, add the finished assistant message to context
         if tool_calls_occurred:

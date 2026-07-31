@@ -60,9 +60,15 @@ CHAT_STORE = {
     async newChat() {
         await simpleApiPost('/api/chat/new');
 
-        this.chat = await simpleApiFetch('/api/chat/current');
-        this.selectedChat = this.chat.id;
-        this.currentTokenUsage = 0;
+        result = await simpleApiFetch('/api/chat/current');
+        if (!result) { return; }
+
+        this.chat = result;
+
+        this.selectedChat = result.id;
+        this.selectedCategory = result.category;
+        this.currentTokenUsage = result.token_usage;
+        this.turnHistory = result.turn_history;
 
         await this.reloadChats();
         await this.reloadChat();

@@ -1,5 +1,4 @@
 openai
-tiktoken
 msgpack
 pyyaml
 json-repair

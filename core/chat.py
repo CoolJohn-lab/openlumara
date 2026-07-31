@@ -175,7 +175,9 @@ class Chat:
 
         index = len(self.data) - 1
         await self._set_current(index)
-        await self.set("token_usage", 0)
+
+        # initialize token usage count using estimated count from the context class
+        await self.set("token_usage", await self.channel.context.get_total_tokens())
 
         self.data.save()
 
@@ -462,17 +464,3 @@ class Chat:
             if chat.get("category") not in collected_categories:
                 collected_categories.append(chat.get("category"))
         return collected_categories
-
-    async def get_token_usage(self):
-        """
-        Returns the chat's current total token usage.
-        Prioritizes the API's data above all,
-        but if not available, will fall back on counting locally using tiktoken
-        """
-        if not self.channel.context.using_api_token_data:
-            return await self.channel.context.count_tokens()
-
-        if self.current is None:
-            return 0 # if there is no chat loaded, we have no token usage
-
-        return self.data[self.current]["token_usage"]

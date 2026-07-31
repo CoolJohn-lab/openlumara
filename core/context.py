@@ -1,5 +1,5 @@
 import core
-import tiktoken
+import json
 
 class Context:
     # special message type (not intended to be added to context) that
@@ -147,25 +147,21 @@ class Context:
         # assistant -> assistant is INVALID (needs spacer)
         if messages:
             enforced_messages = []
-            for i, msg in enumerate(messages):
+            for msg in messages:
                 if enforced_messages:
                     last_role = enforced_messages[-1].get("role")
                     current_role = msg.get("role")
 
-                    # Check for assistan->assistant where the first assistant had tool_calls
-                    # This suggests a tool message was removed, so the sequence might be valid
+                    # assistant -> assistant: insert user spacer
                     if last_role == "assistant" and current_role == "assistant":
-                        prev_msg = enforced_messages[-1]
-                        if prev_msg.get("tool_calls"):
-                            # The previous assistant had tool_calls, so a tool message might have been removed.
-                            pass  # Don't insert spacer - the tool message was probably removed
-                        else:
-                            # No tool_calls on previous assistant, so this is a genuine assistant→assistant violation
-                            enforced_messages.append({"role": "user", "content": " "})
+                        enforced_messages.append({"role": "user", "content": " "})
+                    # user -> user: insert assistant spacer
                     elif last_role == "user" and current_role == "user":
                         enforced_messages.append({"role": "assistant", "content": " "})
+                    # tool -> user: insert assistant spacer (tool result without assistant response)
                     elif last_role == "tool" and current_role == "user":
                         enforced_messages.append({"role": "assistant", "content": " "})
+                    # user -> tool: insert assistant spacer (tool call without tool result)
                     elif last_role == "user" and current_role == "tool":
                         enforced_messages.append({"role": "assistant", "content": " "})
 
@@ -175,14 +171,21 @@ class Context:
 
         # 2. Build and Trim Context
         # We combine them to check the total token count
+
+        # Count tool tokens separately (tools are passed as a separate API parameter, not as messages)
+        tool_tokens = 0
+        if self.channel.manager.tools:
+            tool_tokens = await self.count_tokens(self.channel.manager.tools)
+
+        # then combine it all
         full_context = system_msg + messages + end_msg
         
-        # Calculate current token count
-        current_tokens = await self.count_tokens(full_context)
+        # Calculate current token count (includes tools + context)
+        current_tokens = await self.count_tokens(full_context) + tool_tokens
 
         # Leave a small buffer (5%) to avoid hitting exact limit
         effective_max_tokens = int(max_tokens * 0.95)
-
+        
         # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
@@ -195,7 +198,7 @@ class Context:
                 mid = (lo + hi) // 2
                 trimmed = messages[mid:]
                 candidate_context = system_msg + trimmed + end_msg
-                tokens = await self.count_tokens(candidate_context)
+                tokens = tool_tokens + await self.count_tokens(candidate_context)
 
                 if tokens <= effective_max_tokens:
                     best_trim = mid
@@ -205,7 +208,7 @@ class Context:
 
             messages = messages[best_trim:]
             full_context = system_msg + messages + end_msg
-            current_tokens = await self.count_tokens(full_context)
+            current_tokens = tool_tokens + await self.count_tokens(full_context)
 
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
@@ -222,126 +225,81 @@ class Context:
         return full_context
 
     async def get_size(self):
-        message_history = await self.get(system_prompt=False)
-        sysprompt = await self.channel.manager.get_system_prompt()
-        histend = await self.channel.manager.get_end_prompt()
+        """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
+
+        # we're using self.get() here because it dynamically trims message history,
+        # and chat.messages.get() would instead return the ENTIRE history without trimming,
+        # which would be an inaccurate count
+        message_history = await self.get(system_prompt=False, end_prompt=False, history=True)
+        sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
+        histend = await self.get(system_prompt=False, end_prompt=True, history=False)
         
-        # Use the chat's count_tokens method for consistency
-        sysprompt_size_tokens = await self.count_tokens([{"role": "system", "content": sysprompt}])
+        # now we count the tokens for each part of the context
+        sysprompt_size_tokens = await self.count_tokens(sysprompt)
         sysprompt_size_words = len(str(sysprompt).split())
         
-        message_hist_size_tokens = await self.count_tokens(await self.chat.messages.get())
+        message_hist_size_tokens = await self.count_tokens(message_history)
         message_hist_size_words = len(str(message_history).split())
         
-        histend_size_tokens = await self.count_tokens([{"role": "user", "content": histend}]) if histend else 0
+        histend_size_tokens = await self.count_tokens(await self.get(system_prompt=False, end_prompt=True, history=False))
         histend_size_words = len(str(histend).split()) if histend else 0
 
-        combined_size_words = message_hist_size_words + sysprompt_size_words + histend_size_words
+        tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
+        tool_array_size_words = len(str(self.channel.manager.tools).split())
 
-        # Get total token usage - prefer API-provided usage if available
-        token_usage = await self.chat.get_token_usage()
+        # get amount of tools active
+        tools_amount = len(self.channel.manager.tools)
+
+        combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
+
+        token_usage = await self.get_total_tokens()
 
         return {
             "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
+            "tools": f"{tools_amount} tools active | {tool_array_size_tokens} tokens | {tool_array_size_words} words",
             "message history size": f"{message_hist_size_tokens} tokens | {message_hist_size_words} words",
             "end prompt size": f"{histend_size_tokens} tokens | {histend_size_words} words",
             "total size": f"{token_usage} tokens | {combined_size_words} words",
         }
 
     def _count_text_tokens(self, text: str) -> int:
-        """Helper to encode text using tiktoken or fallback to character heuristic"""
+        """does the actual token-counting by counting characters"""
+
         if not text:
             return 0
+        
+        # 1 token is roughly 4 characters for most English text
+        return len(text) // 4
 
-        if self.token_encoding:
-            try:
-                return len(self.token_encoding.encode(text))
-            except Exception:
-                # Fallback if encoding specifically fails
-                return len(text) // 4
-        else:
-            # Fallback: 1 token is roughly 4 characters for most English text
-            return len(text) // 4
+    async def get_total_tokens(self):
+        """returns the total amount of tokens taken up by the prompt + the tools array"""
 
-    async def count_tokens(self, messages: list = None):
+        context = await self.get()
+        if not context:
+            return 0
+
+        num_tokens = await self.count_tokens(context)
+
+        # add the total token count of the tools array
+        if self.channel.manager.tools:
+            num_tokens += await self.count_tokens(self.channel.manager.tools)
+
+        return num_tokens
+
+    async def count_tokens(self, data):
         """
-        Counts token usage locally using tiktoken (with fallback)
+        the function that gets called all over the framework to count the token usage of any data.
+        converts the data into a json string, then uses _count_text_tokens() to do the actual counting
         """
         num_tokens = 0
 
-        if messages is None:
-            messages = await self.get(system_prompt=True, end_prompt=True)
-
-        if isinstance(messages, core.api.APIError):
+        if isinstance(data, core.api.APIError):
             return 0
 
-        # only set the tiktoken encoder if the model changed
-        # model name changes when connecting for the first time
-        # or when swapping models
-        model_name = self.channel.manager.API.get_model()
-        if model_name != self.model_name:
-            self.model_name = model_name
+        try:
+            data_str = json.dumps(data)
+        except Exception as e:
+            raise Exception(f"Error while counting tokens: {core.detail_error(e)}")
 
-            try:
-                self.token_encoding = tiktoken.encoding_for_model(model_name)
-            except KeyError:
-                self.token_encoding = tiktoken.get_encoding("cl100k_base")
-            except Exception as e:
-                # If tiktoken fails to load (e.g. no internet and no cache), we set to None
-                # _count_text_tokens then uses a character-based fallback
-                self.token_encoding = None
-                self.channel.log_error("[TIKTOKEN] Falling back on character-based token counting.", e)
-                pass
-
-        for message in messages:
-            # Conservative token counting:
-            # - 3 tokens for message overhead (OpenAI format: <im_start>role\ncontent<im_end>\n)
-            num_tokens += 3
-
-            # Count content
-            if "content" in message:
-                content = message["content"]
-                if isinstance(content, str):
-                    num_tokens += self._count_text_tokens(content)
-                elif isinstance(content, list):
-                    # if its multimodal, skip all non-text content because we filter that out when using context.get()
-                    for part in content:
-                        if isinstance(part, dict):
-                            part_text = part.get("text")
-                            if isinstance(part_text, str):
-                                num_tokens += self._count_text_tokens(part_text)
-
-            # If there's a name, add it (it's part of the message)
-            if "name" in message and isinstance(message["name"], str):
-                num_tokens += self._count_text_tokens(message["name"])
-
-            # Count reasoning content if present
-            if "reasoning_content" in message and isinstance(message["reasoning_content"], str):
-                num_tokens += self._count_text_tokens(message["reasoning_content"])
-
-            # Count tool calls if present (in assistant messages)
-            if "tool_calls" in message and isinstance(message["tool_calls"], list):
-                for tool_call in message["tool_calls"]:
-                    if isinstance(tool_call, dict):
-                        # Count the call ID
-                        if "id" in tool_call and isinstance(tool_call["id"], str):
-                            num_tokens += self._count_text_tokens(tool_call["id"])
-                        # Count the type
-                        if "type" in tool_call and isinstance(tool_call["type"], str):
-                            num_tokens += self._count_text_tokens(tool_call["type"])
-                        # Count the function name and arguments
-                        if "function" in tool_call and isinstance(tool_call["function"], dict):
-                            function = tool_call["function"]
-                            if "name" in function and isinstance(function["name"], str):
-                                num_tokens += self._count_text_tokens(function["name"])
-                            if "arguments" in function and isinstance(function["arguments"], str):
-                                num_tokens += self._count_text_tokens(function["arguments"])
-
-            # Count tool_call_id if present (in tool result messages)
-            if "tool_call_id" in message and isinstance(message["tool_call_id"], str):
-                num_tokens += self._count_text_tokens(message["tool_call_id"])
-
-        # Add 1 token for final assistant priming (conservative)
-        num_tokens += 1
-
-        return int(num_tokens)
+        num_tokens = self._count_text_tokens(data_str)
+        return num_tokens

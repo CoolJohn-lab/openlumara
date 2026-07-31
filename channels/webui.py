@@ -486,7 +486,7 @@ async def create_fastapi(channel):
     @app.post("/api/chat/new")
     async def chat_new():
         """Creates a new chat"""
-        return api_result(success=await channel.context.chat.new())
+        return api_result(await channel.context.chat.new())
 
     @app.post("/api/chat/rename/{chat_id}")
     async def chat_rename(chat_id: str, request: fastapi.Request):

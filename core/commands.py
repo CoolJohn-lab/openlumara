@@ -236,7 +236,7 @@ def _get_config_value(path: list):
 
 class Commands:
     # delete these after they are shown to the user once
-    GHOST = ("help", "new", "clear", "context", "prompt", "tools", "stop")
+    GHOST = ("help", "new", "clear", "context", "prompt", "tools")
     PUBLIC_COMMANDS = ("new", "clear", "status", "stop")
 
     def __init__(self, channel):
