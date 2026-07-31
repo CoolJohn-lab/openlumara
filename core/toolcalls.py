@@ -234,10 +234,6 @@ class ToolcallManager:
                 await self.channel.context.get(system_prompt=True, end_prompt=False),
                 tools=self.channel.manager.tools
             ):
-                if self.channel.manager.API.cancel_request:
-                    await self.channel.push("toolcalling chain cancelled")
-                    return
-
                 token_type = token.get("type")
 
                 if token_type == "content":
@@ -269,37 +265,28 @@ class ToolcallManager:
                         recursion_counter=recursion_counter,
                         push=push
                     ):
-                        if self.channel.manager.API.cancel_request:
-                            await self.channel.push("toolcalling chain cancelled")
-                            return
                         yield sub_token
 
-            # only add final message if we didn't make a recursive call
-            # (the innermost call handles adding the final message)
-            if not had_recursive_call:
-                final_content_str = "".join(final_content)
-                final_reasoning_str = "".join(final_reasoning)
+            # if we're finally out of the recursive call loop (so, this was the last toolcall)
+            # we return the final message for the caller (usually the channel) to do stuff with
+            if not had_recursive_call and (final_content or final_reasoning):
+                final_msg = {"role": "assistant", "content": "".join(final_content)}
+                if final_reasoning:
+                    final_msg["reasoning_content"] = "".join(final_reasoning)
 
-                if final_content_str or final_reasoning_str:
-                    final_msg = {"role": "assistant", "content": final_content_str}
+                yield {"type": "final", "content": final_msg}
 
-                    if final_reasoning_str:
-                        final_msg["reasoning_content"] = final_reasoning_str
-
-                    await self.channel.context.chat.messages.add(final_msg)
-                    self.channel.agentic_loop_start = len(await self.channel.context.chat.messages.get())-1
-
-                    if push:
-                        await self.channel.push(final_msg)
+                # set the agentic loop marker so that context.py knows where to start removing reasoning from toolcall messages
+                self.channel.agentic_loop_start = len(await self.channel.context.chat.messages.get())-1
 
         except asyncio.CancelledError:
-            # cancellation during recursive toolcalling - commit the final message
+            # cancellation during recursive toolcalling, so we just take the content/reasoning accumulated so far and return it
             if final_content or final_reasoning:
                 final_msg = {"role": "assistant", "content": "".join(final_content)}
                 if final_reasoning:
                     final_msg["reasoning_content"] = "".join(final_reasoning)
-                await self.channel.context.chat.messages.add(final_msg)
-            raise
+
+                yield {"type": "final", "content": final_msg}
         except Exception as e:
             self.channel.log_error(f"Error while handling tool calls", e)
             await self.channel.push(

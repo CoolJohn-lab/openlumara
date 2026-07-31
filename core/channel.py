@@ -649,15 +649,18 @@ class Channel:
                     pass
                 elif token_type == "tool_calls":
                     tool_calls_occurred = True
-
                     toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
 
-                    # we add the accumulated content tokens so far to the assistant_content argument
+                    # the AI has decided to call a tool, so now we start the recursive toolcall loop (aka agentic loop)
+                    # AI calls tool -> gets response -> decides whether it needs to call more tools -> does so if needed -> gets response -> rinse and repeat
                     async for sub_token in self.tc_manager.process(toolcall_request):
+                        if sub_token.get("type") == "final":
+                            # this is the final message in the recursive toolcalling loop, so we add it to context
+                            await self.context.chat.messages.add(sub_token.get("content"))
+
                         yield sub_token
-                    # tc_manager.process() will loop until the AI no longer deems tool calls necessary
                 elif token_type == "tool":
-                    # this is a toolcall response
+                    # this is a toolcall response.. we only need to yield it
                     pass
                 elif token_type == "token_usage":
                     # this is the final token usage count, usually emitted at the end of the stream
@@ -672,20 +675,25 @@ class Channel:
 
                         fetched_token_usage = True
         except asyncio.CancelledError:
-            # stream was cancelled - freeze and commit whatever state we have
-            if final_content and not tool_calls_occurred:
-                # no tool calls, just add the assistant message with accumulated content
-                assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-                await self._send_postprocess(assistant_message)
-            raise
+            # if the stream is cancelled at this level, we need to handle the accumulated content in a special way
+            # since at this point, tc_manager.process() has added a bunch of messages with content, reasoning, and toolcalls and their responses to context
+            # so tc_manager.process() takes care of it, finalizing the last message and adding it to context
+            # here, we just abort
+            return
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
             yield {"type": "token_usage", "content": await self.context.count_tokens(), "source": "estimation"}
 
-        if not tool_calls_occurred and final_content: # don't add an extra message at the end of a toolcalling chain
-            assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-            await self._send_postprocess(assistant_message)
+        # and finally, once the stream has completed, add the finished assistant message to context
+        if tool_calls_occurred:
+            # if tool calls occurred, we don't want the reasoning from the first message to be added to context
+            # (that would cause a duplicate)
+            # so we remove it
+            final_reasoning = None
+
+        assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+        await self._send_postprocess(assistant_message)
 
     async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None):
         """
