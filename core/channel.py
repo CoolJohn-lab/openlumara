@@ -676,10 +676,15 @@ class Channel:
                         fetched_token_usage = True
         except asyncio.CancelledError:
             # if the stream is cancelled at this level, we need to handle the accumulated content in a special way
-            # since at this point, tc_manager.process() has added a bunch of messages with content, reasoning, and toolcalls and their responses to context
-            # so tc_manager.process() takes care of it, finalizing the last message and adding it to context
-            # here, we just abort
-            return
+
+            if tool_calls_occurred:
+                # since at this point, tc_manager.process() has added a bunch of messages with content, reasoning, and toolcalls and their responses to context
+                # tc_manager.process() takes care of it, finalizing the last message and adding it to context
+                # so we just abort
+                return
+            else:
+                # otherwise, we actually want the normal assistant message adding path to be taken
+                pass
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
