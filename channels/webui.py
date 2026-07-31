@@ -212,7 +212,14 @@ class Webui(core.channel.Channel):
             asyncio.ensure_future(self.websocket_manager.broadcast(log_message))
 
     async def on_shutdown(self):
+        # broadcast first so clients know we're going away
         await self.websocket_manager.broadcast({"type": "shutdown"})
+        
+        # then properly stop uvicorn
+        # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
+        self.server.should_exit = True
+        while not self.server.should_exit:
+            await asyncio.sleep(0.05)
 
 # -------------------
 # Helper Functions
