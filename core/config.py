@@ -75,6 +75,10 @@ core_settings_schema = {
             "default": 0.7,
             "description": "Sampling temperature for the model (0.0 to 2.0)."
         },
+        "use_tools": {
+            "default": True,
+            "description": "Enable tool/function calling for the model. Turn this off if you just wanna talk to the AI and don't care for all this agentic stuff! Essentially turns it into a chatbot that can't actually do anything, but it can still answer your questions."
+        },
         "enable_thinking": {
             "default": True,
             "description": "Enable reasoning (thinking) for the model."
@@ -87,7 +91,7 @@ core_settings_schema = {
         "only_preserve_reasoning_for_current_agentic_loop": {
             "default": True,
             "description": "An 'agentic loop' is a chain of multiple thoughts, toolcalls, and so on, until the AI reaches a conclusion. When you make a request to the AI, such as `search the web for kitty facts and write a summary of it to a note`, it will first think, then do the web search, then think again (sometimes), then write it to a note, and then it will tell you that it's done. That's an agentic loop! So when you enable this, the AI will forget the thoughts it had in previous agentic loops, which is a huge context/token saver.",
-            "depends": "keep_reasoning_in_context"
+            "depends": {"enable_thinking": True, "keep_reasoning_in_context": True},
         },
         "reasoning_effort": {
             "default": "none",
@@ -100,12 +104,9 @@ core_settings_schema = {
                 "high": 3,
                 "xhigh": 4,
                 "max": 5
-            }
+            },
+            "depends": "enable_thinking"
         },
-        "use_tools": {
-            "default": True,
-            "description": "Enable tool/function calling for the model. Turn this off if you just wanna talk to the AI and don't care for all this agentic stuff! Essentially turns it into a chatbot that can't actually do anything, but it can still answer your questions."
-        }
     },
     "channels": {
         "enabled": {
@@ -662,6 +663,7 @@ def get_core_settings_structure():
                 "type": field_schema.get("type"),
                 "options": field_schema.get("options"),
                 "unsafe": field_schema.get("unsafe", False),
+                "depends": field_schema.get("depends"),
                 "min": field_schema.get("min"),
                 "max": field_schema.get("max"),
                 "step": field_schema.get("step")

@@ -43,7 +43,8 @@ class WritingStyle(core.module.Module):
         },
         "custom_writing_flair": {
             "default": None,
-            "description": "Will only be used if you set writing flair to custom. Define a custom writing flair for your AI here!"
+            "description": "Define a custom writing flair for your AI here!",
+            "depends": {"writing_flair": "custom"}
         },
         "writing_length": {
             "default": "default",
@@ -154,7 +155,8 @@ class WritingStyle(core.module.Module):
         },
         "custom_mood": {
             "default": None,
-            "description": "Define a custom mood for the AI. Only used if mood is set to custom! Use simple descriptions of only a few words, such as \"happy\", \"sad\" and so on."
+            "description": "Define a custom mood for the AI. Use simple descriptions of only a few words, such as \"happy\", \"sad\" and so on.",
+            "depends": {"mood": "custom"}
         },
         "desire": {
             "default": "default",
@@ -172,7 +174,8 @@ class WritingStyle(core.module.Module):
         },
         "custom_desire": {
             "default": None,
-            "description": "Define a custom desire for the AI. Only used if desire is set to custom!"
+            "description": "Define a custom desire for the AI.",
+            "depends": {"mood": "desire"}
         }
     }
 

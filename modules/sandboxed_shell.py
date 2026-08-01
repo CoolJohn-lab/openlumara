@@ -23,13 +23,23 @@ class SandboxedShell(core.module.Module):
             "default": False,
             "description": "Whether the sandbox container has access to the internet"
         },
+        "read_only": {
+            "default": True,
+            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
+        },
         "persistent_data": {
             "default": True,
             "description": "When on, the /data folder in the sandbox is persistent (and mapped to your host system). When off, it's a temporary folder in RAM (tmpfs)"
         },
         "sandbox_path": {
             "default": "~/sandbox",
-            "description": "The path to the folder your shell will be limited to. It can't access anything outside this folder!"
+            "description": "The path to the folder your shell will be limited to. It can't access anything outside this folder!",
+            "depends": {"persistent_data": True}
+        },
+        "temporary_filesystem_size_limit": {
+            "default": "512m",
+            "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g). Only works when persistent_data is off.",
+            "depends": {"persistent_data": False}
         },
         "execution_timeout": {
             "default": 10,
@@ -51,14 +61,6 @@ class SandboxedShell(core.module.Module):
         "max_processes": {
             "default": 10,
             "description": "Maximum amount of processes to allow"
-        },
-        "temporary_filesystem_size_limit": {
-            "default": "512m",
-            "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g). Only works when persistent_data is off."
-        },
-        "read_only": {
-            "default": True,
-            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
         },
         "image": {
             "default": "python:3.11-slim",

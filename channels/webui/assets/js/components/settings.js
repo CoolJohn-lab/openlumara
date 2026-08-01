@@ -106,8 +106,9 @@ function settingsModal() {
 
         /**
          * Checks if a setting's dependency is satisfied.
-         * @param {string} depends - The key path to the boolean dependency field (e.g., "some_field" or "parent.child")
-         * @returns {boolean} True if the dependency field is true or if depends is null/empty
+         * @param {string|object} depends - Either a key path string (e.g., "some_field" or "parent.child") for truthy checks,
+         *                                  or an object mapping keys to expected values (e.g., {"some_field": true, "other": "value"})
+         * @returns {boolean} True if all dependencies are satisfied, or if depends is null/empty
          */
         checkDependency(depends) {
             if (!depends) return true;
@@ -130,7 +131,24 @@ function settingsModal() {
             
             if (!settings) return true;
             
-            // Parse the dependency path (supports dot notation for nested fields)
+            // Handle object format: {"field_name": expected_value, "nested.field": 42}
+            if (typeof depends === 'object' && !Array.isArray(depends)) {
+                for (const [keyPath, expectedValue] of Object.entries(depends)) {
+                    const keys = keyPath.split('.');
+                    let currentValue = settings;
+                    
+                    for (const key of keys) {
+                        if (currentValue === undefined || currentValue === null) return false;
+                        currentValue = currentValue[key]?.value;
+                    }
+                    
+                    if (currentValue !== expectedValue) return false;
+                }
+                return true;
+            }
+            
+            // Handle string format (backward compatible): "field_name" or "parent.child"
+            // Checks if the value is truthy
             const keys = depends.split('.');
             let currentValue = settings;
             
@@ -139,7 +157,7 @@ function settingsModal() {
                 currentValue = currentValue[key]?.value;
             }
             
-            return currentValue === true;
+            return !!currentValue;
         },
 
         /*
