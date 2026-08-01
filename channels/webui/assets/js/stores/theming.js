@@ -40,7 +40,7 @@ THEME_STORE = {
         const root = document.documentElement;
 
         // Reset to base vars
-        const baseTheme = window.themes['base'][mode] || window.themes['base']['dark'];
+        const baseTheme = window.themes['base'];
         for (const [varName, value] of Object.entries(baseTheme)) {
             root.style.setProperty(varName, value);
         }
