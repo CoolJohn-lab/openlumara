@@ -20,7 +20,11 @@ function renderMarkdown(text) {
     }
 
     // protect against XSS
-    const clean = DOMPurify.sanitize(html);
+    html = DOMPurify.sanitize(html);
 
-    return clean;
+    // add the copy button to all pre statements using a custom alpine directive
+    // (defined in directives/copy-code.js)
+    html = html.replace(/<pre><code/g, '<pre><code x-copy-code');
+
+    return html;
 }
