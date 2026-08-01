@@ -231,8 +231,13 @@ class Webui(core.channel.Channel):
         # then properly stop uvicorn
         # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
         self.server.should_exit = True
-        while not self.server.should_exit:
-            await asyncio.sleep(0.05)
+
+        # wait for uvicorn to actually finish shutting down
+        try:
+            await asyncio.wait_for(self.server.shutdown(), timeout=5.0)
+        except (AttributeError, asyncio.TimeoutError):
+            # fallback: just give it a moment to release the socket
+            await asyncio.sleep(0.5)
 
 # -------------------
 # Helper Functions
