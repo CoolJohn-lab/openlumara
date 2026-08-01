@@ -27,11 +27,13 @@ class Time(core.module.Module):
             "default": "local",
             "description": "Your timezone",
             "type": "select",
-            "options": TIMEZONES
+            "options": TIMEZONES,
+            "depends": "add_timezone"
         },
         "date_format": {
             "default": "%c",
-            "description": "A string that describes exactly how to display the date/time to your AI. Uses strftime format (https://github.com/Vishxnu/Python-strftime-cheatsheet)"
+            "description": "A string that describes exactly how to display the date/time to your AI. Uses strftime format (https://github.com/Vishxnu/Python-strftime-cheatsheet)",
+            "depends": "add_timezone"
         }
     }
 

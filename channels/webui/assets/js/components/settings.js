@@ -104,6 +104,44 @@ function settingsModal() {
             }
         },
 
+        /**
+         * Checks if a setting's dependency is satisfied.
+         * @param {string} depends - The key path to the boolean dependency field (e.g., "some_field" or "parent.child")
+         * @returns {boolean} True if the dependency field is true or if depends is null/empty
+         */
+        checkDependency(depends) {
+            if (!depends) return true;
+            
+            const settingsStore = Alpine.store('settings');
+            const category = settingsStore.categories[this.activeCategory];
+            
+            if (!category) return true;
+            
+            let settings = null;
+            
+            // For modules/channels, settings are nested under the module/channel name
+            if (this.activeModule || this.activeChannel) {
+                const moduleName = this.activeModule || this.activeChannel;
+                settings = category.settings?.[moduleName]?.value;
+            } else {
+                // For core config sections, settings are directly under category.settings
+                settings = category.settings;
+            }
+            
+            if (!settings) return true;
+            
+            // Parse the dependency path (supports dot notation for nested fields)
+            const keys = depends.split('.');
+            let currentValue = settings;
+            
+            for (const key of keys) {
+                if (currentValue === undefined || currentValue === null) return false;
+                currentValue = currentValue[key]?.value;
+            }
+            
+            return currentValue === true;
+        },
+
         /*
          * ### THEME SETTINGS ###
          */

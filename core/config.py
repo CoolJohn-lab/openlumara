@@ -81,11 +81,13 @@ core_settings_schema = {
         },
         "keep_reasoning_in_context": {
             "default": True,
-            "description": "Keep the model's reasoning process in the conversation context. If you turn this off, the model won't remember its own thoughts, just the conclusions it drew. Can be useful for saving context."
+            "description": "Keep the model's reasoning process in the conversation context. If you turn this off, the model won't remember its own thoughts, just the conclusions it drew. Can be useful for saving context.",
+            "depends": "enable_thinking"
         },
         "only_preserve_reasoning_for_current_agentic_loop": {
             "default": True,
-            "description": "An 'agentic loop' is a chain of multiple thoughts, toolcalls, and so on, until the AI reaches a conclusion. When you make a request to the AI, such as `search the web for kitty facts and write a summary of it to a note`, it will first think, then do the web search, then think again (sometimes), then write it to a note, and then it will tell you that it's done. That's an agentic loop! So when you enable this, the AI will forget the thoughts it had in previous agentic loops, which is a huge context/token saver."
+            "description": "An 'agentic loop' is a chain of multiple thoughts, toolcalls, and so on, until the AI reaches a conclusion. When you make a request to the AI, such as `search the web for kitty facts and write a summary of it to a note`, it will first think, then do the web search, then think again (sometimes), then write it to a note, and then it will tell you that it's done. That's an agentic loop! So when you enable this, the AI will forget the thoughts it had in previous agentic loops, which is a huge context/token saver.",
+            "depends": "keep_reasoning_in_context"
         },
         "reasoning_effort": {
             "default": "none",
@@ -466,8 +468,8 @@ def _get_module_schema_cache():
         for section_key in sections_to_refresh:
             package, base_class = package_map[section_key]
             try:
-                # skip reloading modules because we just want the data
-                classes = core.modules.load(package, base_class, reload=False, loading_config=True)
+                # Force reload modules to pick up schema changes from disk
+                classes = core.modules.load(package, base_class, reload=True, loading_config=True)
 
                 for cls in classes:
                     name = core.modules.get_name(cls)

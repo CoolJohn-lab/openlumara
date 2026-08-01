@@ -11,7 +11,10 @@ class Lists(core.module.Module):
             "description": "Whether to put pinned lists in the system prompt. This will make your AI aware of pinned lists and their content at all times! So you can simply ask your AI to pin one of your lists, and then it will always know what's in it. Careful though, this can blow up context size fast, depending on the list!",
             "default": True
         },
-        "max_pinned_lists": 10
+        "max_pinned_lists": {
+            "default": 10,
+            "depends": "insert_system_prompt"
+        }
     }
 
     async def on_ready(self):

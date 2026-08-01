@@ -114,7 +114,8 @@ function buildFieldSettings(obj, schema, prefix = '') {
                 options: fieldSchema.options || null,
                 min: fieldSchema.min,
                 max: fieldSchema.max,
-                step: fieldSchema.step
+                step: fieldSchema.step,
+                depends: fieldSchema.depends || null
             };
         } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !isToggleList(value)) {
             // Nested object without schema definition - recurse
@@ -122,6 +123,7 @@ function buildFieldSettings(obj, schema, prefix = '') {
                 type: 'object',
                 title: formatLabel(key),
                 description: fieldSchema.description || null,
+                depends: fieldSchema.depends || null,
                 settings: buildFieldSettings(value, fieldSchema, fullKey)
             };
         } else if (isToggleList(value)) {
@@ -152,6 +154,7 @@ function buildFieldSettings(obj, schema, prefix = '') {
                 type: detectType(value, fullKey),
                 description: fieldSchema.description || null,
                 unsafe: fieldSchema.unsafe || false,
+                depends: fieldSchema.depends || null,
                 value: value,
                 options: fieldSchema.options || null,
                 min: fieldSchema.min,

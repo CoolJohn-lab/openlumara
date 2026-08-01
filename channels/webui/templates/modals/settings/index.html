@@ -63,7 +63,11 @@
                                 <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
                                 
                                 <template x-for="[key, setting] in Object.entries($store.settings.categories[activeCategory].settings)" :key="key">
-                                    {% include 'modals/settings/fields.html' %}
+                                    <template x-if="!setting.unsafe || $store.settings.showUnsafe">
+                                        <div class="setting-item" :class="{ 'unsafe': setting.unsafe }" x-show="checkDependency(setting.depends)">
+                                            {% include 'modals/settings/fields.html' %}
+                                        </div>
+                                    </template>
                                 </template>
                             </div>
                         </template>
