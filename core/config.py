@@ -38,7 +38,7 @@ core_settings_schema = {
     "api": {
         "url": {
             "default": "http://localhost:5001/v1",
-            "description": "The base URL for the API endpoint. Get this from your chosen software (such as [llamacpp](https://llama.app/), [koboldcpp](https://github.com/LostRuins/koboldcpp), [lemonade](https://lemonade-server.ai/), [lm studio](https://www.lmstudio.ai/home), or any other software you may prefer) or from your cloud API provider."
+            "description": "The base URL for the API endpoint. Get this from your chosen software (such as [llamacpp](https://llama.app/), [koboldcpp](https://koboldai.org/cpp), [lemonade](https://lemonade-server.ai/), or any other software you may prefer) or from your cloud API provider."
         },
         "key": {
             "default": "openlumara-dummy-key",
@@ -182,16 +182,6 @@ core_settings_schema = {
     }
 }
 
-def _flatten_settings(settings_dict):
-    """Recursively flattens a settings dictionary by extracting 'default' values."""
-    if isinstance(settings_dict, dict) and "default" in settings_dict:
-        return _flatten_settings(settings_dict["default"])
-    if isinstance(settings_dict, dict):
-        return {k: _flatten_settings(v) for k, v in settings_dict.items()}
-    return settings_dict
-
-default_config = _flatten_settings(core_settings_schema)
-
 DEFAULT_MODULES = (
     "tutorial",
     "docs",
@@ -214,6 +204,16 @@ DEFAULT_MODULES = (
 )
 
 DEFAULT_CHANNELS = ["cli", "webui"]
+
+def _flatten_settings(settings_dict):
+    """Recursively flattens a settings dictionary by extracting 'default' values."""
+    if isinstance(settings_dict, dict) and "default" in settings_dict:
+        return _flatten_settings(settings_dict["default"])
+    if isinstance(settings_dict, dict):
+        return {k: _flatten_settings(v) for k, v in settings_dict.items()}
+    return settings_dict
+
+default_config = _flatten_settings(core_settings_schema)
 
 class ConfigManager:
     def __init__(self, config, base_path=None):
