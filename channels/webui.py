@@ -48,10 +48,6 @@ class Webui(core.channel.Channel):
     # and currently, many of the settings don't do anything yet
     # but i plan to support these of course
     settings = {
-        "title": {
-            "default": "OpenLumara",
-            "description": "The title to show in the header, above the chat window"
-        },
         "network_mode": {
             "type": "select",
             "options": {
@@ -62,8 +58,8 @@ class Webui(core.channel.Channel):
             "default": "local"
         },
         "custom_host": {
-            "description": "If you want to use a custom hostname, set it here. If you don't know what that is, don't bother with this! Just use the network mode setting on either local or internet.",
-            "default": None
+            "default": None,
+            "depends": {"network_mode": "custom"}
         },
         "port": {
             "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
@@ -73,26 +69,57 @@ class Webui(core.channel.Channel):
             "description": "Whether to allow /commands that control the openlumara server. Turn this off if you expose your openlumara instance to the internet without a login!",
             "default": True
         },
-        "enable_sidebar": {
-            "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
-            "default": True
-        },
         "enable_chat_header": {
             "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
             "default": True
         },
-        "enable_streaming_state_display": {
-            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful!",
-            "default": True
+        "enable_title": {
+            "default": True,
+            "description": "Whether to show a fancy title in the header",
+            "depends": "enable_chat_header"
+        },
+        "title": {
+            "default": "OpenLumara",
+            "depends": {"enable_chat_header": True, "enable_title": True}
         },
         "enable_chat_titlebar": {
             "description": "Whether to show the name of the chat below the header",
             "default": False
         },
+        "enable_streaming_state_display": {
+            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful! Disabled on mobile due to lack of space.",
+            "default": True,
+            "depends": "enable_chat_header",
+        },
+        "enable_sidebar": {
+            "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
+            "default": True
+        },
         "show_unsafe_settings": {
             "description": "Whether to show unsafe settings. This setting has to be manually toggled via `/config` or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
             "default": False,
             "unsafe": True
+        },
+        "require_login": {
+            "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
+            "default": False
+        },
+        "username": {
+            "default": "admin",
+            "depends": "require_login"
+        },
+        "password": {
+            "default": "admin",
+            "depends": "require_login"
+        },
+        "login_lifetime": {
+            "description": "How many days to stay logged in for",
+            "default": 30,
+            "depends": "require_login"
+        },
+        "debug_mode": {
+            "description": "When enabled, this will show a ton of webui-related messages in the server console. Very useful for debugging webui related issues!",
+            "default": False
         },
         "log_level": {
             "type": "select",
@@ -106,20 +133,6 @@ class Webui(core.channel.Channel):
                 "debug": "Show debugging information"
             }
         },
-        "require_login": {
-            "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
-            "default": False
-        },
-        "username": "admin",
-        "password": "admin",
-        "login_lifetime": {
-            "description": "How many days to stay logged in for",
-            "default": 30
-        },
-        "debug_mode": {
-            "description": "When enabled, this will show a ton of webui-related messages in the server console. Very useful for debugging webui related issues!",
-            "default": False
-        }
     }
 
     async def _verify_credentials(self, username: str, password: str) -> bool:
