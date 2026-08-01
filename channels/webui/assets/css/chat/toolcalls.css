@@ -483,7 +483,4 @@
     margin-left: 4px;
 }
 
-/* Shimmer keyframes for the bar fill */
-@keyframes shimmer {
-    to { background-position: 200% center; }
-}
+

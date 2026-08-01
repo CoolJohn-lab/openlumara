@@ -7,6 +7,11 @@
     padding: 0;
 }
 
+/* Utility classes */
+.nopadding {
+    padding: 0 !important;
+}
+
 html, body {
     height: 100%;
     width: 100%;
@@ -90,56 +95,6 @@ div  {
 * {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar) transparent;
-}
-
-/* Force scrollbar visibility in key containers */
-.settings-sidebar,
-.settings-content,
-.modal,
-.setting-array-items,
-.toggle-list-grid,
-.custom-font-options,
-.settings-nav,
-.storage-file-list,
-.storage-dict-keys-list {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar) transparent;
-}
-
-/* Webkit overrides for specific scrollable areas */
-.settings-sidebar::-webkit-scrollbar,
-.settings-content::-webkit-scrollbar,
-.modal::-webkit-scrollbar,
-.setting-array-items::-webkit-scrollbar,
-.toggle-list-grid::-webkit-scrollbar,
-.settings-nav::-webkit-scrollbar,
-.storage-file-list::-webkit-scrollbar,
-.storage-dict-keys-list::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-.settings-sidebar::-webkit-scrollbar-thumb,
-.settings-content::-webkit-scrollbar-thumb,
-.modal::-webkit-scrollbar-thumb,
-.setting-array-items::-webkit-scrollbar-thumb,
-.toggle-list-grid::-webkit-scrollbar-thumb,
-.settings-nav::-webkit-scrollbar-thumb,
-.storage-file-list::-webkit-scrollbar-thumb,
-.storage-dict-keys-list::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: var(--radius-full);
-}
-
-.settings-sidebar::-webkit-scrollbar-thumb:hover,
-.settings-content::-webkit-scrollbar-thumb:hover,
-.modal::-webkit-scrollbar-thumb:hover,
-.setting-array-items::-webkit-scrollbar-thumb:hover,
-.toggle-list-grid::-webkit-scrollbar-thumb:hover,
-.settings-nav::-webkit-scrollbar-thumb:hover,
-.storage-file-list::-webkit-scrollbar-thumb:hover,
-.storage-dict-keys-list::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-hover);
 }
 
 /* ==========================================================================

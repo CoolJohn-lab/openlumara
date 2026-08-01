@@ -104,25 +104,6 @@
     flex: 1;
     padding: 8px;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar) transparent;
-}
-
-.global-search-results::-webkit-scrollbar {
-    width: 6px;
-}
-
-.global-search-results::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.global-search-results::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: var(--radius-full);
-}
-
-.global-search-results::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-hover);
 }
 
 .global-search-result-count {
