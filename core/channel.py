@@ -683,8 +683,8 @@ class Channel:
         if tool_calls_occurred:
             # if tool calls occurred, we don't want the reasoning from the first message to be added to context
             # (that would cause a duplicate)
-            # so we remove it
-            final_reasoning = None
+            # so we abort early
+            return
 
         assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
         await self._send_postprocess(assistant_message)

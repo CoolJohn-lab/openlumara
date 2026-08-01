@@ -37,6 +37,7 @@ class APIClient():
 
         self.connected = False
         self._AI = None # replaced later using .connect()
+        self.is_streaming = False
 
         self._messages = []
 
@@ -486,6 +487,8 @@ class APIClient():
             return
 
         try:
+            self.is_streaming = True
+
             async for token in self._recv_stream(response):
                 if self.cancel_request:
                     # cancel the entire stream
@@ -501,9 +504,14 @@ class APIClient():
             raise  # let callers handle cancellation
         except Exception as e:
             yield {"type": "error", "content": f"While sending request to AI: {core.detail_error(e)}"}
+        finally:
+            self.is_streaming = False
 
     async def cancel(self):
         """cancel a request that's been sent to the AI"""
+        if not self.is_streaming:
+            return False
+
         self.cancel_request = True
 
         # wait for the cancellation to complete
