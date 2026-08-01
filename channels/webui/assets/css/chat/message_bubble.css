@@ -154,7 +154,6 @@
             word-break: break-word;
         }
 
-
         &.assistant {
             background: var(--bg-message-ai);
             border: 1px solid var(--border-message);
@@ -166,9 +165,6 @@
 
             .content.reasoning {
                 font-family: monospace;
-            }
-
-            .content.normal {
             }
         }
 

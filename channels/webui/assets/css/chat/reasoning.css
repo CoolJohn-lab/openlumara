@@ -44,11 +44,6 @@
         border-radius: var(--radius-sm);
         overflow: hidden;
         opacity: 1;
-        /*
-        transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                    opacity 0.25s ease,
-                    padding 0.25s ease;
-        */
     }
 
     .content {
@@ -109,28 +104,6 @@
 .reasoning-wrapper:first-child {
     margin-top: 0;
 }
-
-/*
-.reasoning-wrapper.collapsed {
-    .toggle {
-        transform: rotate(-90deg);
-    }
-
-    .reasoning-wrapper.collapsed .header {
-        border-radius: var(--radius-sm);
-    }
-}
-
-.reasoning-wrapper.expanded {
-    .toggle {
-        transform: rotate(0deg);
-    }
-    .block {
-        border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-        animation: reasoningBlockFadeIn 0.3s ease-out forwards;
-    }
-}
-*/
 
 /* Reasoning Streaming Animation */
 @keyframes reasoningBlockFadeIn {

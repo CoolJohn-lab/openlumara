@@ -246,28 +246,19 @@
     50% { border-left-color: var(--accent-glow); }
 }
 
-
 @keyframes statusPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
-
 
 @keyframes streamingDot {
     0%, 80%, 100% { opacity: 0.3; }
     40% { opacity: 1; }
 }
 
-.tool-call-arg-value.streaming {
-}
-
 /* =============================================================================
  *  Tool Response Section - Compact & Clean
  *  ============================================================================= */
-
-/* 
- * AI SLOP BELOW - needs refactor!
- */
 
 .tool-response-section {
     background: transparent;
@@ -383,7 +374,7 @@
 }
 
 /* =============================================================================
- *  Tool Processing Indicator - Enhanced Fancy Style
+ *  Tool Processing Indicator
  *  ============================================================================= */
 
 
@@ -430,16 +421,6 @@
     mask-composite: exclude;
     -webkit-mask-composite: xor;
     opacity: 0.8;
-}
-
-@property --angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
-}
-
-@keyframes rotate {
-    to { --angle: 360deg; }
 }
 
 .tool-processing-spinner {

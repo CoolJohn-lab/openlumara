@@ -82,7 +82,6 @@
                 }
             }
 
-
             ::placeholder {
                 color: var(--text-muted);
                 transition: opacity 0.2s ease;
@@ -170,6 +169,7 @@
             }
 
             .streaming-icon {
+                display: flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
@@ -187,31 +187,16 @@
     }
 }
 
-/* --- AI SLOP BELOW, NEEDS REFACTOR --- */
+/* ==========================================================================
+ *  Streaming Indicator (inside stop button during streaming)
+ *  ========================================================================== */
 
-.streaming-indicator {
-    display: none;
-    align-items: center;
-}
-
-
-/* Ensure SVGs render on mobile */
-@media (max-width: 768px) {
-    #stop svg {
-        width: 20px !important;
-        height: 20px !important;
-        stroke: var(--error, #f87171) !important;
-        fill: none !important;
-    }
-}
-
-/* Streaming indicator dots */
 .streaming-indicator {
     display: inline-flex;
     align-items: center;
     margin-left: 6px;
 }
-/* Only position absolutely when actually visible (during streaming states) */
+
 #stop.streaming .streaming-indicator {
     position: absolute;
     bottom: 10px;
@@ -228,178 +213,40 @@
     background: var(--error);
     margin-right: 3px;
     animation: dotPulse 1.4s infinite ease-in-out;
+}
 
-    :nth-child(1) {
-        animation-delay: 0s;
+.indicator-dot:nth-child(1) { animation-delay: 0s; }
+.indicator-dot:nth-child(2) { animation-delay: 0.2s; }
+.indicator-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+    0%, 80%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
     }
-
-    :nth-child(2) {
-        animation-delay: 0.2s;
-    }
-
-    :nth-child(3) {
-        animation-delay: 0.4s;
-    }
-
-    @keyframes dotPulse {
-        0%, 80%, 100% {
-            opacity: 0.3;
-            transform: scale(0.8);
-        }
-        40% {
-            opacity: 1;
-            transform: scale(1.2);
-        }
-    }
-
-    @keyframes buttonPopIn {
-        from {
-            opacity: 0;
-            transform: scale(0.8);
-        }
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
+    40% {
+        opacity: 1;
+        transform: scale(1.2);
     }
 }
 
-/* Token Usage Bar - Slim & Replaces Top Border */
-.token-usage-container {
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg-primary); /* Blends seamlessly with input area */
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    box-sizing: border-box;
+/* Ensure stop button SVGs render correctly on mobile */
+@media (max-width: 768px) {
+    #stop svg {
+        width: 20px !important;
+        height: 20px !important;
+        stroke: var(--error, #f87171) !important;
+        fill: none !important;
+    }
 }
 
-.token-usage-bar-bg {
-    width: 100%;
-    height: 1px; /* Ultra-slim track */
-    background: var(--border-color);
-    overflow: hidden;
-}
+/* ==========================================================================
+ *  Token Bar Hidden State
+ *  ========================================================================== */
 
-.token-usage-bar-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--accent) !important; /* Sleek gradient */
-    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.token-usage-bar-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    transform: translateX(-100%);
-    animation: shimmer 2s infinite;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.token-usage-container.shimmer-active .token-usage-bar-fill::after {
-    opacity: 1;
-}
-
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-
-.token-usage-text {
-    position: relative;
-    height: 0px;
-    white-space: nowrap;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    transition: color 0.2s ease;
-    text-align: right;
-    margin-right: 15px;
-    bottom: 0.45rem;
-    z-index: 1;
-}
-
-/* Warning state for high token usage */
-.token-usage-container.warning .token-usage-bar-fill {
-    background: linear-gradient(90deg, #f59e0b, #ef4444);
-}
-
-.token-usage-container.warning .token-usage-text {
-    color: var(--error);
-}
-
-body.token-bar-hidden .input-area {
+body.token-bar-hidden #chat-window #input {
     border-top: 1px solid var(--border-color);
 }
-
-/* Streaming Status Indicator */
-.streaming-status-indicator {
-    font-size: 0.8rem;
-    color: var(--text-secondary, #888);
-    font-style: italic;
-    margin: 4px 0 0 0; 
-    padding: 2px 8px;
-    animation: streamingFadeIn 0.3s ease-out;
-    display: inline-block;
-    width: 100%;
-    box-sizing: border-box;
-    text-align: left;
-}
-
-@keyframes streamingFadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Optimistic UI Styles */
-.user-placeholder {
-    opacity: 0.7;
-    filter: grayscale(0.5);
-}
-
-.placeholder-status {
-    font-size: 0.75rem;
-    color: var(--text-secondary, #888);
-    margin-top: 4px;
-    font-style: italic;
-    text-align: left;
-}
-
-.typing-status-text {
-    display: block;
-    text-align: left; 
-    font-size: 0.75rem;
-    color: var(--text-secondary, #888);
-    margin-bottom: 4px;
-    margin-top: 0;
-    font-style: italic;
-    width: 100%;
-    box-sizing: border-box;
-    animation: statusFadeIn 0.2s ease-out;
-}
-
-.typing-status-text.hidden {
-    display: none;
-}
-
-@keyframes statusFadeIn {
-    from { opacity: 0; transform: translateY(2px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-}
-
-/* Restore normal border & adjust padding when token bar is hidden */
-body.token-bar-hidden .input-area {
-    border-top: 1px solid var(--border-color);
-}
-
 
 #file-input {
     display: none;

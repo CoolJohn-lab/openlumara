@@ -60,7 +60,7 @@
     }
 
     .close {
-        padding: 0px 4px;
+        padding: 0 4px;
         background: transparent;
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
@@ -75,19 +75,6 @@
             background: var(--button-bg);
             color: var(--button-text);
             border-color: var(--accent);
-        }
-
-        .content {
-            padding: 24px;
-
-            h3 {
-                margin-bottom: 12px;
-                font-size: 0.85rem;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                color: var(--text-secondary);
-                font-weight: 600;
-            }
         }
     }
 

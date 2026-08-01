@@ -64,15 +64,6 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        opacity: 1 !important; /* Stats stay visible */
+        opacity: 1 !important;
     }
 }
-
-/* 
-.user .message-buttons {
-    justify-content: flex-start;
-}
-.assistant .message-buttons {
-    justify-content: flex-end;
-}
-*/

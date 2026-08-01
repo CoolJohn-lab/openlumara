@@ -141,9 +141,6 @@
             max-height: 10rem;
             flex-shrink: 0;
 
-            width: 100%;              /* items fill the chat list */
-            max-width: 100%;          /* don't let them overflow */
-
             &.disabled {
                 opacity: 0.5;
                 cursor: not-allowed;
@@ -315,17 +312,6 @@
                 }
             }
 
-            @keyframes slideInRight {
-                from {
-                    opacity: 0;
-                    transform: translateX(-20px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateX(0);
-                }
-            }
-
             .animate-in {
                 animation: slideInRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             }
@@ -373,6 +359,17 @@
             border-color: var(--accent);
             box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
         }
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
     }
 }
 

@@ -5,7 +5,6 @@
         label {
             font-size: 0.9rem;
             color: var(--text-primary);
-
         }
     }
 
@@ -170,9 +169,7 @@
             width: 100%;
             margin-top: 4px;
         }
-
     }
-
 
     /* --- Toggle --- */
     .toggle {
@@ -359,7 +356,7 @@
             gap: 4px;
 
             label {
-                margin-bottom: 0px !important;
+                margin-bottom: 0 !important;
             }
         }
 
@@ -374,7 +371,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 0px !important;
+            margin-bottom: 0 !important;
         }
 
         .item input {

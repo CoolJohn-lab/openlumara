@@ -68,7 +68,7 @@
     }
 
     .error-msg {
-      color: #ff4d4d;
+      color: var(--error, #ff4d4d);
       text-align: center;
       margin-bottom: 1rem;
       font-size: 0.9rem;
