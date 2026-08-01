@@ -801,10 +801,6 @@ async def create_fastapi(channel):
                         case "stop":
                             if channel:
                                 await channel.manager.API.cancel()
-
-                                stream_id = data.get("id")
-                                if stream_id:
-                                    channel.stream_cancellations.add(stream_id)
                         case "reload_messages":
                             await ws_mgr.broadcast({
                                 "type": "sync"
