@@ -60,9 +60,115 @@
             </div>
         </template>
 
+        <!-- Array/List -->
+        <template x-if="setting.type === 'array'">
+            <div class="row">
+                <div class="array-field">
+                    <div class="array-header">
+                        <label x-text="setting.title"></label>
+                        <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                    </div>
+                    
+                    <div class="items" x-data="{ newItem: '' }">
+                        <template x-for="(item, index) in setting.value" :key="index">
+                            <div class="item">
+                                <input type="text" :value="item" @input="updateSetting(setting, setting.value.map((v, i) => i === index ? $event.target.value : v))">
+                                <button type="button" class="remove" 
+                                        @click="updateSetting(setting, setting.value.filter((_, i) => i !== index))"
+                                        title="Remove item">×</button>
+                            </div>
+                        </template>
+                        
+                        <template x-if="setting.value.length === 0">
+                            <span class="empty-hint">No items. Add items below.</span>
+                        </template>
+                        
+                        <div class="add-row">
+                            <input type="text" 
+                                   placeholder="Add new item..."
+                                   x-model="newItem"
+                                   @keydown.enter="
+                                       if (newItem.trim()) {
+                                           updateSetting(setting, [...setting.value, newItem.trim()]);
+                                           newItem = '';
+                                       }
+                                   ">
+                            <button type="button" class="add"
+                                    @click="
+                                        if (newItem.trim()) {
+                                            updateSetting(setting, [...setting.value, newItem.trim()]);
+                                            newItem = '';
+                                        }
+                                    ">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Dict/Object -->
+        <template x-if="setting.type === 'object'">
+            <div class="row">
+                <div class="array-field">
+                    <div class="array-header">
+                        <label x-text="setting.title"></label>
+                        <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                    </div>
+                    
+                    <div class="items" x-data="{ newKey: '', newValue: '' }">
+                        <template x-for="(entry, index) in Object.entries(setting.value || {})" :key="index">
+                            <div class="item">
+                                <input type="text" :value="entry[0]" placeholder="Key"
+                                       @input="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).map(([k, v], i) => i === index ? [$event.target.value, v] : [k, v])))">
+                                <input type="text" :value="entry[1]" placeholder="Value"
+                                       @input="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).map(([k, v], i) => i === index ? [k, $event.target.value] : [k, v])))">
+                                <button type="button" class="remove" 
+                                        @click="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).filter(([k, v], i) => i !== index)))"
+                                        title="Remove item">×</button>
+                            </div>
+                        </template>
+                        
+                        <template x-if="!setting.value || Object.keys(setting.value).length === 0">
+                            <span class="empty-hint">No entries. Add entries below.</span>
+                        </template>
+                        
+                        <div class="add-row">
+                            <input type="text" 
+                                   placeholder="Key"
+                                   x-model="newKey"
+                                   @keydown.enter="
+                                       if (newKey.trim()) {
+                                           updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                           newKey = '';
+                                       }
+                                   ">
+                            <input type="text" 
+                                   placeholder="Value"
+                                   x-model="newValue"
+                                   @keydown.enter="
+                                       if (newKey.trim()) {
+                                           updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                           newKey = '';
+                                           newValue = '';
+                                       }
+                                   ">
+                            <button type="button" class="add"
+                                    @click="
+                                        if (newKey.trim()) {
+                                            updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                            newKey = '';
+                                            newValue = '';
+                                        }
+                                    ">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
         <!--
             special fields can be defined in the detectType() function
-            over in js/modals/settings/fields.js
+            over in js/utils/detect_field_type.js
         -->
         <!-- API url field -->
         <template x-if="setting.type === 'api_url'">

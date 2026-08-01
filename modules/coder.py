@@ -83,13 +83,11 @@ class Coder(core.module.Module):
         "allow_total_overwrites": {"description": "Allow full file overwrites in full edits mode. Dangerous with some models.", "default": False},
         "coding_style": {"default": "", "description": "Style guidelines added to the system prompt.", "type": "long_text"},
         "add_project_list_to_system_prompt": {"default": True, "description": "Add available projects to the system prompt."},
-        "limits": {
-            "folder_blacklist": {"description": "Folders to skip during recursive listing.", "default": ["venv", "__pycache__"]},
-            "max_file_size": {"description": "Max file size in MB for reading.", "default": 10},
-            "max_read_lines": {"description": "Max lines to read per file.", "default": 1000},
-            "max_grep_results": 50,
-            "backup_retention_count": {"description": "Backups to keep per file.", "default": 10}
-        },
+        "folder_blacklist": {"description": "Folders to skip during recursive listing.", "default": ["venv", "__pycache__"]},
+        "max_file_size": {"description": "Max file size in MB for reading.", "default": 10},
+        "max_read_lines": {"description": "Max lines to read per file.", "default": 1000},
+        "max_grep_results": 50,
+        "backup_retention_count": {"description": "Backups to keep per file.", "default": 10},
         "allow_code_execution": {"description": "Execute written code. Extremely dangerous.", "unsafe": True, "default": False}
     }
 
@@ -159,7 +157,7 @@ class Coder(core.module.Module):
         return core.sandbox_path(self.sandbox_path, combined)
 
     def _check_file_size(self, file_path: str) -> Tuple[bool, Optional[str]]:
-        max_size_bytes = self.config.get("limits", {}).get("max_file_size", 10) * 1024 * 1024
+        max_size_bytes = self.config.get("max_file_size", 10) * 1024 * 1024
         try:
             size = os.path.getsize(file_path)
             if size > max_size_bytes:
@@ -270,7 +268,7 @@ class Coder(core.module.Module):
             return None
 
     def _cleanup_old_backups(self, basename: str, max_count: int = None):
-        max_count = max_count or self.config.get("limits", {}).get("backup_retention_count", 10)
+        max_count = max_count or self.config.get("backup_retention_count", 10)
         backup_dir = self._get_backup_dir()
         try:
             backups = [(os.path.getmtime(os.path.join(backup_dir, f)), os.path.join(backup_dir, f))
@@ -359,7 +357,7 @@ class Coder(core.module.Module):
                             tree[entry.name] = None
                             files_counter += 1
                     elif entry.is_dir():
-                        blacklist = self.config.get("limits", {}).get("folder_blacklist", [])
+                        blacklist = self.config.get("folder_blacklist", [])
                         if entry.name in blacklist or entry.name.startswith('.'):
                             continue
                         folder_key = f"{entry.name}/"
@@ -827,7 +825,7 @@ class Coder(core.module.Module):
                 lines = f.readlines()
 
             total_lines = len(lines)
-            max_lines = self.config.get("limits", {}).get("max_read_lines", 1000)
+            max_lines = self.config.get("max_read_lines", 1000)
             start_idx = max(0, (offset or 1) - 1)
             end_idx = min(start_idx + (limit or max_lines), total_lines)
 
@@ -921,10 +919,10 @@ class Coder(core.module.Module):
         search_dir = core.sandbox_path(self._get_project_path(project_name), path) if path else self._get_project_path(project_name)
         if not os.path.isdir(search_dir):
             return self.result("Error: search directory does not exist", success=False)
-        max_results = max_results or self.config.get("limits", {}).get("max_grep_results", 50)
+        max_results = max_results or self.config.get("max_grep_results", 50)
         
         # Get folder blacklist from config
-        folder_blacklist = set(self.config.get("limits", {}).get("folder_blacklist", ["venv", "__pycache__"]))
+        folder_blacklist = set(self.config.get("folder_blacklist", ["venv", "__pycache__"]))
 
         try:
             # Compile the regex pattern with native timeout support
@@ -1017,7 +1015,7 @@ class Coder(core.module.Module):
             return self.result("Error: search directory does not exist", success=False)
         
         # Get folder blacklist from config
-        folder_blacklist = set(self.config.get("limits", {}).get("folder_blacklist", ["venv", "__pycache__"]))
+        folder_blacklist = set(self.config.get("folder_blacklist", ["venv", "__pycache__"]))
         
         try:
             # Normalize the pattern - ensure it supports recursive search

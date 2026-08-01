@@ -347,4 +347,100 @@
             }
         }
     }
+
+    .array-field {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+
+        .array-header {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            label {
+                margin-bottom: 0px !important;
+            }
+        }
+
+        .items {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0px !important;
+        }
+
+        .item input {
+            flex: 1;
+        }
+
+        .remove {
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+
+            &:hover {
+                background: var(--bg-tertiary);
+                color: #e74c3c;
+            }
+        }
+
+        .empty-hint {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 4px 0;
+        }
+
+        .add-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+
+            input {
+                flex: 1;
+            }
+
+            .add {
+                width: 42px;
+                height: 42px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-sm);
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                font-size: 20px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.15s;
+                flex-shrink: 0;
+
+                &:hover {
+                    border-color: var(--accent);
+                    background: var(--button-bg);
+                    color: var(--button-text);
+                }
+            }
+        }
+    }
 }
