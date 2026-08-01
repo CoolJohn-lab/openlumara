@@ -177,12 +177,10 @@ class WritingStyle(core.module.Module):
     }
 
     async def on_system_prompt(self):
-        constraints = []
+        constraints = [""]
 
         style = self.config.get("writing_style")
         match style:
-            case "default":
-                constraints.append("") # so that writing flair is supported even with no style selected
             case "chat":
                 constraints.append("Style: Messaging app (Telegram/Discord).")
             case "chat with slang":
@@ -232,6 +230,10 @@ class WritingStyle(core.module.Module):
                 constraints[-1] += "Speak in 1337 (leet) language"
             case "morse code":
                 constraints[-1] += "Output all words in morse code format"
+
+        # if by now the first constraint is empty, just remove it
+        if len(constraints[0]) == 0:
+            constraints.pop(0)
 
         cap_style = self.config.get("capitalization_style")
         match cap_style:
