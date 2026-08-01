@@ -1,51 +1,75 @@
 THEME_STORE = {
     family: localStorage.getItem('themeFamily') || 'monochrome',
     mode: localStorage.getItem('themeMode') || 'dark',
+    themeCache: {},  // Cache for loaded theme data
+    themeList: [],   // List of available theme families
 
-    // Load themes from API if not already loaded
-    async init() {
-        if (!window.themes) {
-            try {
-                const response = await fetch('/themes.js');
-                const text = await response.text();
-                eval(text);
-            } catch (e) {
-                console.error('Failed to load themes:', e);
-                window.themes = {};
-            }
-        }
-        this.apply(this.family, this.mode);
+    // Initialize - load everything asynchronously, page themed immediately
+    init() {
+        // Load theme list (just names and modes) - async, doesn't block
+        fetch('/api/themes')
+            .then(r => r.json())
+            .then(data => { this.themeList = data; })
+            .catch(e => console.error('Failed to load themes:', e));
+
+        // Load base theme and current theme family - async, will apply when ready
+        this.loadThemeFamily('base').then(() => {
+            this.loadThemeFamily(this.family).then(() => {
+                this.apply(this.family, this.mode);
+            });
+        });
     },
 
-    // Apply theme - this is the core reactive function
+    // Load a specific theme family if not already cached
+    async loadThemeFamily(family) {
+        if (this.themeCache[family]) {
+            return this.themeCache[family];
+        }
+
+        try {
+            const response = await fetch(`/api/themes/${family}`);
+            if (!response.ok) {
+                throw new Error(`Failed to load theme: ${response.statusText}`);
+            }
+            this.themeCache[family] = await response.json();
+            return this.themeCache[family];
+        } catch (e) {
+            console.error(`Failed to load theme family '${family}':`, e);
+            return null;
+        }
+    },
+
+    // Apply theme - synchronous after init
     apply(family, mode) {
-        if (!window.themes || !window.themes[family]) {
+        const themeData = this.themeCache[family];
+        if (!themeData) {
             console.error('Theme family not found:', family);
             return;
         }
 
-        const themeData = window.themes[family];
-
         // Handle mode fallback
+        let effectiveMode = mode;
         if (!themeData[mode]) {
             const alternateMode = mode === 'dark' ? 'light' : 'dark';
             if (themeData[alternateMode]) {
-                mode = alternateMode;
+                effectiveMode = alternateMode;
             } else {
-                mode = 'dark';
+                effectiveMode = 'dark';
             }
         }
 
-        const finalTheme = themeData[mode];
+        const finalTheme = themeData[effectiveMode];
         const root = document.documentElement;
 
-        // Reset to base vars
-        const baseTheme = window.themes['base'];
-        for (const [varName, value] of Object.entries(baseTheme)) {
-            root.style.setProperty(varName, value);
+        // Apply base theme vars first
+        const baseTheme = this.themeCache['base'];
+        if (baseTheme) {
+            for (const [varName, value] of Object.entries(baseTheme)) {
+                root.style.setProperty(varName, value);
+            }
         }
 
-        // Apply theme vars
+        // Apply theme vars on top of base
         for (const [varName, value] of Object.entries(finalTheme)) {
             root.style.setProperty(varName, value);
         }
@@ -53,22 +77,22 @@ THEME_STORE = {
         // Switch code syntax highlighting theme based on mode
         const codeThemeLink = document.getElementById('code-theme');
         if (codeThemeLink) {
-            codeThemeLink.href = mode === 'dark'
+            codeThemeLink.href = effectiveMode === 'dark'
                 ? '/assets/css/code-themes/github-dark.css'
                 : '/assets/css/code-themes/github-light.css';
         }
 
         // Update state
         this.family = family;
-        this.mode = mode;
+        this.mode = effectiveMode;
 
         // Persist
         localStorage.setItem('themeFamily', family);
-        localStorage.setItem('themeMode', mode);
+        localStorage.setItem('themeMode', effectiveMode);
 
         // Dispatch event for other components to react
         document.dispatchEvent(new CustomEvent('theme-changed', {
-            detail: { family, mode }
+            detail: { family, mode: effectiveMode }
         }));
     },
 
@@ -103,21 +127,44 @@ THEME_STORE = {
         document.head.appendChild(link);
     },
 
-    // Get theme families for UI
+    // Get theme families for UI (grouped by prefix)
     getFamilies() {
-        const families = {};
-        const themes = window.themes || {};
+        const groups = {};
+        const others = [];
         
-        for (const family in themes) {
-            if (family === 'base') continue;  // hide base from UI
-
-            const themeData = themes[family];
-            families[family] = {
-                dark: !!themeData.dark,
-                light: !!themeData.light
+        for (const theme of this.themeList) {
+            const themeInfo = {
+                dark: theme.dark,
+                light: theme.light
             };
+            
+            // Group by the word before the first hyphen
+            const parts = theme.name.split('-');
+            if (parts.length > 1) {
+                const groupKey = parts[0].toLowerCase();
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push({ name: theme.name, ...themeInfo });
+            } else {
+                others.push({ name: theme.name, ...themeInfo });
+            }
         }
         
-        return families;
+        // Sort others alphabetically
+        others.sort((a, b) => a.name.localeCompare(b.name));
+        
+        return { groups, others };
+    },
+    
+    // Get sorted group names
+    getGroupNames() {
+        const families = this.getFamilies();
+        return Object.keys(families.groups).sort();
+    },
+    
+    // Get group name (capitalized)
+    getGroupName(groupKey) {
+        return groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
     }
 }

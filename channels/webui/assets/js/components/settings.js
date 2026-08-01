@@ -18,8 +18,8 @@ function settingsModal() {
         mobile: window.innerWidth <= 768,
 
         // Theme state (synced with Alpine store)
-        themeFamily: null,
-        themeMode: null,
+        themeFamily: localStorage.getItem('themeFamily') || 'monochrome',
+        themeMode: localStorage.getItem('themeMode') || 'dark',
 
         // Font settings
         fontFamily: localStorage.getItem('fontFamily') || 'default',
@@ -232,8 +232,8 @@ function settingsModal() {
          * ### THEME SETTINGS ###
          */
         // Alpine-reactive theme toggle
-        toggleThemeMode(isLight) {
-            Alpine.store('theme').apply(this.themeFamily, isLight ? 'light' : 'dark');
+        async toggleThemeMode(isLight) {
+            await Alpine.store('theme').apply(this.themeFamily, isLight ? 'light' : 'dark');
         },
         
         // Alpine-reactive font change
@@ -264,29 +264,51 @@ function settingsModal() {
         },
         
         // Alpine-reactive theme family selection
-        selectThemeFamily(family) {
+        async selectThemeFamily(family) {
             this.themeFamily = family;
+            await Alpine.store('theme').loadThemeFamily(family);
             Alpine.store('theme').apply(family, this.themeMode);
         },
         
-        // Get theme families for x-for loop
+        // Get grouped theme families for dropdown
         getThemeFamilies() {
             return Alpine.store('theme').getFamilies();
         },
 
+        // Get group names
+        getThemeGroups() {
+            return Alpine.store('theme').getGroupNames();
+        },
+
+        // Get group display name
+        getThemeGroupName(groupKey) {
+            return Alpine.store('theme').getGroupName(groupKey);
+        },
+
         // Helper to get theme preview gradient
         getThemePreviewStyle(family) {
-            if (!window.themes || !window.themes[family]) return '';
-            const theme = window.themes[family];
-            const colors = theme[this.themeMode] || theme['dark'];
+            const themeData = Alpine.store('theme').themeCache[family];
+            if (!themeData) return '';
+            const colors = themeData[this.themeMode] || themeData['dark'];
             const bg = colors['--bg-primary'] || '#000';
             const accent = colors['--accent'] || '#fff';
             return `background: linear-gradient(135deg, ${bg} 50%, ${accent} 50%);`;
         },
 
-        // Helper to format theme name
+        // Helper to format theme name (remove group prefix, replace hyphens with spaces)
         formatThemeName(family) {
-            return family.charAt(0).toUpperCase() + family.slice(1);
+            const parts = family.split('-');
+            // Skip the first part (group prefix) and join the rest with spaces
+            const displayName = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+            // Capitalize first letter
+            return displayName.charAt(0).toUpperCase() + displayName.slice(1);
+        },
+
+        // Check if theme has a specific mode variant
+        themeHasMode(mode) {
+            const themeData = Alpine.store('theme').themeCache[this.themeFamily];
+            if (!themeData) return true; // Assume available if not loaded yet
+            return !!themeData[mode];
         }
     };
 }

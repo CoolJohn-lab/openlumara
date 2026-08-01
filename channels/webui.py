@@ -666,26 +666,48 @@ async def create_fastapi(channel):
         return api_result(message, success=True)
 
     # ----------------------------
-    # Dynamically generated files
+    # Theme API endpoints
     # ----------------------------
-    @app.get("/themes.js")
+    @app.get("/api/themes")
     async def get_themes():
-        """Returns a dynamically generated themes.js file constructed from all theme json files within the webui themes folder"""
+        """Returns a list of available theme families with their supported modes (dark/light)"""
         themes_dir = os.path.join(channel.path, "themes")
-        all_themes = {}
+        theme_list = []
 
         for f in os.listdir(themes_dir):
-            if f.endswith('.json'):
+            if f.endswith('.json') and f != 'base.json':
+                family_name = f[:-5]
                 filepath = os.path.join(themes_dir, f)
-                with open(filepath, 'r', encoding='utf-8') as fh:
-                    all_themes[f[:-5]] = json.load(fh)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as fh:
+                        theme_data = json.load(fh)
+                        theme_list.append({
+                            "name": family_name,
+                            "dark": "dark" in theme_data,
+                            "light": "light" in theme_data
+                        })
+                except Exception as e:
+                    channel.log(channel.name, f"failed to read theme {filepath}: {e}")
 
-        js_parts = []
-        for key in sorted(all_themes.keys()):
-            js_parts.append(f"'{key}': {json.dumps(all_themes[key])}")
+        theme_list.sort(key=lambda x: x["name"])
+        return theme_list
 
-        themes_script = f"window.themes = {{ {', '.join(js_parts)} }};"
-        return fastapi.Response(themes_script, media_type="application/javascript")
+    @app.get("/api/themes/{family_name}")
+    async def get_theme(family_name: str):
+        """Returns full theme data for a specific family"""
+        themes_dir = os.path.join(channel.path, "themes")
+        filepath = os.path.join(themes_dir, f"{family_name}.json")
+        
+        if not os.path.exists(filepath):
+            return api_result(f"Theme family '{family_name}' not found", success=False)
+
+        try:
+            with open(filepath, 'r', encoding='utf-8') as fh:
+                theme_data = json.load(fh)
+            return theme_data
+        except Exception as e:
+            channel.log(channel.name, f"failed to load theme {filepath}: {e}")
+            return api_result(f"Failed to load theme: {str(e)}", success=False)
 
     def generate_cache_version():
         # generate an sw.js cache version based on this file's last modified time

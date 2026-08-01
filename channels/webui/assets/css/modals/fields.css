@@ -139,7 +139,7 @@
 
         label {
             font-size: 14px;
-            color: var(--text-secondary);
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -241,7 +241,7 @@
     /* --- Field Descriptions --- */
     .description {
         font-size: 0.8rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         margin-top: 4px;
 
         a {
@@ -338,7 +338,7 @@
 
             .description {
                 font-size: 12px;
-                color: var(--text-muted);
+                color: var(--text-secondary);
                 line-height: 1.4;
                 margin: 0;
             }

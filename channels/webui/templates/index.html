@@ -63,6 +63,7 @@
         {% endfor %}
 
         <link rel="stylesheet" id="code-theme" href="{{ url_for('assets', path='css/code-themes/github-dark.css') }}">
+
     </head>
     <body>
         <!-- 
@@ -114,12 +115,11 @@
         <!--
             dynamically generated themes file
 
-            uses json files for individual themes,
-            and then generates this one themes.js file from them.
+            returns raw JSON which the frontend parses directly,
+            eliminating the need for eval() and JS wrapping.
 
             it's easy to make your own theme!
         -->
-        <script src="/themes.js"></script>
 
         <!-- Alpine stores -->
         {% for js_file in alpine_stores %}
