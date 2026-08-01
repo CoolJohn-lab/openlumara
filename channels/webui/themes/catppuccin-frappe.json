@@ -4,7 +4,7 @@
     "--bg-secondary": "#292c3c",
     "--bg-tertiary": "#232634",
     "--bg-message-user": "#414559",
-    "--bg-message-ai": "linear-gradient(135deg, #303446 0%, #3a3e52 100%)",
+    "--bg-message-ai": "linear-gradient(135deg, #303446 0%, #3a3e52 60%, #383458 100%)",
     "--bg-message-command": "linear-gradient(135deg, #1a2e1a 0%, #142814 100%)",
     "--bg-message-command-response": "linear-gradient(135deg, #1a1a2e 0%, #141428 100%)",
     "--bg-input": "#292c3c",
@@ -21,15 +21,15 @@
     "--text-muted": "#838ba7",
     "--text-code": "#b5bfe2",
 
-    "--accent": "#8caaee",
-    "--accent-glow": "rgba(140, 170, 238, 0.1)",
+    "--accent": "#ca9ee6",
+    "--accent-glow": "rgba(202, 158, 230, 0.1)",
 
     "--error": "#e78284",
     "--error-bg": "linear-gradient(135deg, #2a1a1e 0%, #1e1418 100%)",
     "--error-border": "#4a3038",
-    "--important": "#e5c890",
-    "--important-bg": "linear-gradient(135deg, #2a2a1a 0%, #202014 100%)",
-    "--important-border": "#4a4a30",
+    "--important": "#ef9f76",
+    "--important-bg": "linear-gradient(135deg, #2a2418 0%, #201c14 100%)",
+    "--important-border": "#4a3e28",
     "--info": "#99d1db",
     "--info-bg": "linear-gradient(135deg, #1a2a2e 0%, #142028 100%)",
     "--info-border": "#304a50",
@@ -45,7 +45,7 @@
     "--shadow-soft": "0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3)",
     "--shadow-medium": "0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)",
     "--shadow-strong": "0 10px 15px rgba(0, 0, 0, 0.6), 0 4px 6px rgba(0, 0, 0, 0.4)",
-    "--shadow-glow": "0 0 20px rgba(140, 170, 238, 0.05)",
+    "--shadow-glow": "0 0 20px rgba(202, 158, 230, 0.05)",
 
     "--tool-bg": "#292c3c",
     "--tool-bg-secondary": "#232634",
@@ -53,7 +53,7 @@
     "--tool-border-hover": "#51576d",
     "--tool-pending-bg": "rgba(198, 208, 245, 0.03)",
     "--tool-pending-color": "#b5bfe2",
-    "--tool-completed-bg": "rgba(140, 170, 238, 0.08)",
-    "--tool-completed-color": "#8caaee"
+    "--tool-completed-bg": "rgba(202, 158, 230, 0.08)",
+    "--tool-completed-color": "#ca9ee6"
   }
 }

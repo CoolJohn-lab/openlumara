@@ -4,7 +4,7 @@
     "--bg-secondary": "#e6e9ef",
     "--bg-tertiary": "#dce0e8",
     "--bg-message-user": "#ccd0da",
-    "--bg-message-ai": "linear-gradient(135deg, #eff1f5 0%, #e6e9ef 100%)",
+    "--bg-message-ai": "linear-gradient(135deg, #eff1f5 0%, #e6e9ef 60%, #e4e0f4 100%)",
     "--bg-message-command": "linear-gradient(135deg, #d8ecd8 0%, #cce0cc 100%)",
     "--bg-message-command-response": "linear-gradient(135deg, #d8d8ec 0%, #cccce0 100%)",
     "--bg-input": "#e6e9ef",
@@ -21,22 +21,22 @@
     "--text-muted": "#8c8fa1",
     "--text-code": "#5c5f77",
 
-    "--accent": "#1e66f5",
-    "--accent-glow": "rgba(30, 102, 245, 0.1)",
+    "--accent": "#8839ef",
+    "--accent-glow": "rgba(136, 57, 239, 0.1)",
 
     "--error": "#d20f39",
     "--error-bg": "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
     "--error-border": "#fecaca",
-    "--important": "#df8e1d",
-    "--important-bg": "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
-    "--important-border": "#fde68a",
+    "--important": "#fe640b",
+    "--important-bg": "linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%)",
+    "--important-border": "#fcd4a0",
     "--info": "#04a5e5",
     "--info-bg": "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
     "--info-border": "#bfdbfe",
 
-    "--button-bg": "#1e66f5",
+    "--button-bg": "#8839ef",
     "--button-text": "#eff1f5",
-    "--button-hover": "#209fb5",
+    "--button-hover": "#722ed4",
     "--button-stop": "#d20f39",
 
     "--scrollbar": "#bcc0cc",
@@ -45,7 +45,7 @@
     "--shadow-soft": "0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03)",
     "--shadow-medium": "0 4px 6px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03)",
     "--shadow-strong": "0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04)",
-    "--shadow-glow": "0 0 20px rgba(30, 102, 245, 0.05)",
+    "--shadow-glow": "0 0 20px rgba(136, 57, 239, 0.08)",
 
     "--tool-bg": "#e6e9ef",
     "--tool-bg-secondary": "#eff1f5",
@@ -53,7 +53,7 @@
     "--tool-border-hover": "#bcc0cc",
     "--tool-pending-bg": "rgba(76, 79, 105, 0.04)",
     "--tool-pending-color": "#5c5f77",
-    "--tool-completed-bg": "rgba(30, 102, 245, 0.08)",
-    "--tool-completed-color": "#1e66f5"
+    "--tool-completed-bg": "rgba(136, 57, 239, 0.08)",
+    "--tool-completed-color": "#8839ef"
   }
 }
