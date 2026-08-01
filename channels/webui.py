@@ -366,7 +366,11 @@ async def create_fastapi(channel):
     @app.get("/login")
     async def login_page(request: fastapi.Request):
         """Shows the login form."""
-        return channel.templates.TemplateResponse(request, "login.html", {"error": None})
+        if channel.config.get("require_login"):
+            return channel.templates.TemplateResponse(request, "login.html", {"error": None})
+        else:
+            return fastapi.responses.RedirectResponse(url="/", status_code=303)
+
     # -- POST
     @app.post("/login")
     async def login_submit(request: fastapi.Request):
