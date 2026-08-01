@@ -10,6 +10,14 @@
             <template x-for="(file, index) in $store.upload.files" :key="'pending-' + index">
                 <div class="item">
                     <div class="file-info">
+                        <span class="file-icon">
+                            <template x-if="file.name.startsWith('pasted-image-')">
+                                <span title="Pasted from clipboard">{% include 'svg/clipboard.svg' %}</span>
+                            </template>
+                            <template x-if="!file.name.startsWith('pasted-image-')">
+                                <span title="File attachment">{% include 'svg/paperclip.svg' %}</span>
+                            </template>
+                        </span>
                         <span class="file-name" x-text="file.name"></span>
                     </div>
                     <button class="delete" @click="$store.upload.removeFile(index)" aria-label="Remove file">&times;</button>
