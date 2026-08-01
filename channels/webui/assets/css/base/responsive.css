@@ -2,6 +2,24 @@
  *  Responsive Styles
  *  ========================================================================== */
 
+/* ==========================================================================
+ *  Accessibility & Device Preferences
+ *  ========================================================================== */
+
+/* Reduced motion preference for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ==========================================================================
+ *  Layout Breakpoints
+ *  ========================================================================== */
+
 /* === MOBILE (< 768px) === */
 @media (max-width: 768px) {
     /* Viewport height — 100vh clips on mobile with address bars */
@@ -155,10 +173,12 @@
         padding: 7px !important;
     }
 
-    .modal {
-        .content-wrapper {
-            padding: 0 !important;
-        }
+    /* Ensure stop button SVGs render correctly on mobile */
+    #stop svg {
+        width: 20px !important;
+        height: 20px !important;
+        stroke: var(--error, #f87171) !important;
+        fill: none !important;
     }
 }
 
@@ -187,20 +207,132 @@
     }
 }
 
-/* === TABLET (600px - 1024px) === */
-@media (min-width: 600px) and (max-width: 1024px) {
-    #sidebar {
-        width: 320px !important;
-    }
-
-    .message {
-        max-width: 85% !important;
-    }
-}
-
 /* === DESKTOP (1024px+) === */
 @media (min-width: 1025px) {
     .message {
         max-width: var(--message-max-width, 75%) !important;
+    }
+}
+
+/* ==========================================================================
+ *  Modals
+ *  ========================================================================== */
+
+@media (max-width: 768px) {
+    .modal {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        inset: 0 !important;
+    }
+
+    .modal .content-wrapper {
+        padding: 14px !important;
+    }
+
+    .global-search-modal-content {
+        width: 100%;
+        max-height: 100vh;
+        top: 0;
+        left: 0;
+        transform: none !important;
+        border-radius: 0;
+    }
+}
+
+/* Settings modal mobile layout */
+@media (max-width: 768px) {
+    .settings-modal {
+        .body {
+            flex-direction: column;
+
+            .sidebar {
+                width: 100% !important;
+                overflow-y: hidden !important;
+                padding: 8px !important;
+                min-width: 100% !important;
+                max-height: 52px !important;
+                border-right: none !important;
+                border-bottom: 1px solid var(--border-color) !important;
+
+                .nav {
+                    flex-direction: row !important;
+                    overflow-x: auto;
+                    padding: 0 8px !important;
+                    gap: 4px !important;
+
+                    .item {
+                        width: auto !important;
+                        white-space: nowrap;
+                        flex-shrink: 0;
+                        margin-bottom: 16px !important;
+                    }
+
+                    .sub-list {
+                        flex-direction: row;
+                        overflow-x: auto;
+                        padding: 4px 8px;
+
+                        button {
+                            white-space: nowrap;
+                            flex-shrink: 0;
+                        }
+                    }
+                }
+
+                .theme-buttons {
+                    flex-direction: column;
+                }
+
+                .unified-card {
+                    flex-direction: column;
+                    align-items: stretch;
+
+                    .info {
+                        width: 100%;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ==========================================================================
+ *  Chat Components
+ *  ========================================================================== */
+
+/* Chat title bar mobile */
+@media (max-width: 600px) {
+    .chat-title-bar {
+        padding: 8px 12px;
+        height: 40px;
+    }
+
+    .chat-title-text {
+        font-size: 0.85rem;
+        max-width: 200px;
+    }
+
+    .chat-title-rename {
+        opacity: 1;
+    }
+}
+
+/* ==========================================================================
+ *  Color Scheme Preferences
+ *  ========================================================================== */
+
+/* Dark theme adjustments for search highlighting */
+@media (prefers-color-scheme: dark) {
+    .message .search-match {
+        background: rgba(255, 220, 100, 0.3);
+    }
+
+    .message .search-match.current {
+        background: var(--accent);
+        color: #000;
     }
 }

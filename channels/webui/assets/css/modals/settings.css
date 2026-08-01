@@ -94,7 +94,7 @@
                     cursor: pointer;
                     transition: all 0.15s ease;
                     position: relative;
-                    margin-bottom: 0 !important;
+                    margin-bottom: 0;
 
                     &:hover {
                         background: var(--button-bg);
@@ -398,78 +398,6 @@
         }
     }
 
-    /* --- Responsive: Mobile --- */
-    @media (max-width: 768px) {
-        .body {
-            flex-direction: column;
-
-            .sidebar {
-                width: 100%;
-                min-width: 100%;
-                max-height: 200px;
-                border-right: none;
-                border-bottom: 1px solid var(--border-color);
-
-                .nav {
-                    flex-direction: row;
-                    overflow-x: auto;
-                    padding: 0 8px;
-                    gap: 4px;
-
-                    .item {
-                        white-space: nowrap;
-                        flex-shrink: 0;
-                    }
-
-                    .sub-list {
-                        flex-direction: row;
-                        overflow-x: auto;
-                        padding: 4px 8px;
-
-                        button {
-                            white-space: nowrap;
-                            flex-shrink: 0;
-                        }
-                    }
-                }
-            }
-
-            .content {
-                padding: 16px;
-            }
-        }
-
-        .theme-buttons {
-            flex-direction: column;
-        }
-
-        .actions {
-            flex-direction: column;
-
-            button {
-                width: 100%;
-            }
-        }
-
-        .unified-card {
-            flex-direction: column;
-            align-items: stretch;
-
-            .info {
-                width: 100%;
-            }
-        }
-    }
 }
 
-/* --- Animations --- */
-@keyframes fade-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
+

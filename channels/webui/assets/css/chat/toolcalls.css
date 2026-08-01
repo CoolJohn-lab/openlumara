@@ -241,20 +241,7 @@
     }
 }
 
-@keyframes toolCallPulse {
-    0%, 100% { border-left-color: var(--accent); }
-    50% { border-left-color: var(--accent-glow); }
-}
 
-@keyframes statusPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
-@keyframes streamingDot {
-    0%, 80%, 100% { opacity: 0.3; }
-    40% { opacity: 1; }
-}
 
 /* =============================================================================
  *  Tool Response Section - Compact & Clean
@@ -382,16 +369,7 @@
     animation: processingFadeIn 0.2s ease-out;
 }
 
-@keyframes processingFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
+
 
 .tool-processing-content {
     position: relative;
@@ -431,10 +409,7 @@
     filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
-@keyframes processingSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
+
 
 .tool-processing-text {
     font-size: 0.9rem;
@@ -449,9 +424,7 @@
     animation: textShimmer 3s linear infinite;
 }
 
-@keyframes textShimmer {
-    to { background-position: 200% center; }
-}
+
 
 /* The container for the bar */
 .tool-progress-bar {
