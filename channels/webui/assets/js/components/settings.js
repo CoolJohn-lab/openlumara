@@ -160,6 +160,74 @@ function settingsModal() {
             return !!currentValue;
         },
 
+        /**
+         * Builds a hierarchical structure from flat settings for nested rendering.
+         * @returns {Array} Array of {setting, children: []} objects
+         */
+        getHierarchicalSettings() {
+            const settingsStore = Alpine.store('settings');
+            const category = settingsStore.categories[this.activeCategory];
+            
+            if (!category) return [];
+            
+            let settings = null;
+            
+            // For modules/channels, settings are nested under the module/channel name
+            if (this.activeModule || this.activeChannel) {
+                const moduleName = this.activeModule || this.activeChannel;
+                settings = category.settings?.[moduleName]?.value;
+            } else {
+                // For core config sections, settings are directly under category.settings
+                settings = category.settings;
+            }
+            
+            if (!settings) return [];
+            
+            // Build hierarchical structure
+            const hierarchical = [];
+            const childrenMap = new Map();
+            
+            // First pass: identify parents and children
+            for (const [key, setting] of Object.entries(settings)) {
+                if (setting.unsafe && !settingsStore.showUnsafe) continue;
+                
+                const depends = setting.depends;
+                let parentKey = null;
+                
+                if (depends) {
+                    if (typeof depends === 'string') {
+                        // Simple dependency - use the dependency key as parent
+                        parentKey = depends.split('.')[0]; // Handle nested deps like "parent.child"
+                    } else if (typeof depends === 'object' && !Array.isArray(depends)) {
+                        // Object dependency - use first key as parent
+                        const firstKey = Object.keys(depends)[0];
+                        parentKey = firstKey.split('.')[0];
+                    }
+                }
+                
+                if (parentKey && settings[parentKey]) {
+                    // This setting is dependent on another
+                    if (!childrenMap.has(parentKey)) {
+                        childrenMap.set(parentKey, []);
+                    }
+                    childrenMap.get(parentKey).push({ key, setting });
+                } else {
+                    // This setting is a parent or has no dependencies
+                    hierarchical.push({ key, setting, children: [] });
+                }
+            }
+            
+            // Second pass: attach children to parents
+            for (const [parentKey, children] of childrenMap) {
+                const parent = hierarchical.find(h => h.key === parentKey);
+                if (parent) {
+                    parent.children = children;
+                }
+            }
+            
+            return hierarchical;
+        },
+
         /*
          * ### THEME SETTINGS ###
          */

@@ -382,6 +382,25 @@
         }
     }
 
+    /* --- Hierarchical Settings --- */
+    .setting-parent {
+        margin-bottom: 16px;
+        position: relative;
+        
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    .setting-child {
+        margin-left: 7px;
+        margin-top: 12px;
+        padding: 0px 7px;
+        border-left: 2px solid var(--accent);
+        position: relative;
+        transition: all 0.2s ease;
+    }
+
     /* --- Unsafe Warning --- */
     .unsafe {
         background: rgba(255, 107, 107, 0.05) !important;
@@ -405,6 +424,16 @@
         .toggle {
             &.toggle-on {
                 background: var(--error) !important;
+            }
+        }
+        
+        /* Override child styles for unsafe items */
+        &.setting-child {
+            border-left-color: var(--error);
+            
+            &::before,
+            &::after {
+                background: var(--error);
             }
         }
     }
