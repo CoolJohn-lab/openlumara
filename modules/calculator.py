@@ -14,7 +14,7 @@ class SafeCalculator:
     and only allowing specific mathematical operations.
     """
 
-    async def on_ready(self):
+    def __init__(self):
         # Mapping of allowed binary operators
         self._binary_operators = {
             ast.Add: operator.add,
