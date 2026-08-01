@@ -1,6 +1,13 @@
 .reasoning-wrapper {
     width: 100%;
     display: inline-block;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-sm);
+
+    &:hover {
+        border: 1px solid var(--tool-border-hover);
+    }
 
     &.collapsed {
         .header {
