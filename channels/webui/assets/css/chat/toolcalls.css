@@ -21,7 +21,7 @@
  *  ============================================================================= */
 
 .tool-call-card {
-    background: linear-gradient(135deg, var(--tool-bg) 0%, var(--tool-bg-secondary) 100%);
+    background: var(--bg-secondary);
     border: 1px solid var(--tool-border);
     border-radius: var(--radius-sm);
     overflow: hidden;
