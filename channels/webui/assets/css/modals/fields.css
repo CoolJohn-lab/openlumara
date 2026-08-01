@@ -243,9 +243,8 @@
 
     /* --- Field Descriptions --- */
     .description {
-        font-size: 12px;
+        font-size: 0.8rem;
         color: var(--text-muted);
-        line-height: 1.4;
         margin-top: 4px;
 
         a {
