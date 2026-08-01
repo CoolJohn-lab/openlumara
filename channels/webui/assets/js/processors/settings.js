@@ -78,8 +78,10 @@ function buildSettingsStructure(originalData, moduleInfo = {}) {
                 }
             }
         } else {
+            // For core config sections (api, model, core, etc.), use the schema from moduleInfo
+            const sectionSchema = (moduleInfo[topKey] && moduleInfo[topKey].settings_schema) || {};
             category.settings = (topValue && typeof topValue === 'object') ? 
-                buildFieldSettings(topValue, {}, topKey) : {};
+                buildFieldSettings(topValue, sectionSchema, topKey) : {};
         }
 
         categories[topKey] = category;

@@ -180,6 +180,7 @@
                     <span :class="{'status-dot': true, 'connected': $store.settings.apiStatus, 'disconnected': !$store.settings.apiStatus}"></span>
                     <span x-text="$store.settings.apiStatus ? 'connected' : 'not connected'"></span>
                 </div>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <template x-if="$store.settings.apiError">
                     <p class="error" x-text="'Could not connect: ' + $store.settings.apiError"></p>
                 </template>
@@ -192,6 +193,7 @@
                 <label x-text="setting.title"></label>
                 <input type="text" :value="setting.value" 
                        @blur="updateSetting(setting, $event.target.value); await $store.settings.saveSettings(); await $store.settings.checkApiConnection();">
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
 

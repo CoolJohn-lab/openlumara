@@ -16,54 +16,178 @@ _registry_cache = None
 
 SCHEMA_CACHE_FILE = ".module_cache.json"
 
-default_config = {
+core_settings_schema = {
     "core": {
-        "data_folder": "data",
-        "auto_resume_chats": True,
-        "cmd_prefix": "/",
-        "tool_timeout": 15
+        "data_folder": {
+            "default": "data",
+            "description": "The folder where openlumara stores its data files (chats, memories, etc.)."
+        },
+        "auto_resume_chats": {
+            "default": True,
+            "description": "Whether to automatically resume the last active chat on startup."
+        },
+        "cmd_prefix": {
+            "default": "/",
+            "description": "The prefix used to determine whether something is a command. For example, when it's set to `/`, all commands must be prefixed with `/` as in `/help`. If you set it to `!`, it will be `!help` instead."
+        },
+        "tool_timeout": {
+            "default": 15,
+            "description": "Timeout in seconds for tool execution. This applies per individual tool, and is used to forcefully kill off tools that run too long."
+        }
     },
     "api": {
-        "url": "http://localhost:5001/v1",
-        "key": "KEY_HERE",
-        "max_context": 16768,
-        "max_output_tokens": 8192,
-        "max_messages": 200,
-        "use_developer_role": False,
-        "custom_fields": {}
+        "url": {
+            "default": "http://localhost:5001/v1",
+            "description": "The base URL for the API endpoint. Get this from your chosen software (i.e. [llamacpp](https://llama.app/), [koboldcpp](https://github.com/LostRuins/koboldcpp), [lemonade](https://lemonade-server.ai/), [lm studio](https://www.lmstudio.ai/home)) or from your cloud API provider."
+        },
+        "key": {
+            "default": "openlumara-dummy-key",
+            "description": "The API key for authentication. For local, this is often unneeded unless you deliberately secured your server with an API key. When in doubt, leave it as default."
+        },
+        "max_context": {
+            "default": 16768,
+            "description": "Maximum number of tokens for the context window. This controls how much of your conversation your AI will remember. The higher the context, the further back it will remember, but how much context an AI supports depends on the model. Check your model's details page or modelcard for information on its supported context size."
+        },
+        "max_output_tokens": {
+            "default": 8192,
+            "description": "Maximum number of tokens for model output. This controls how much text your AI is allowed to generate. If you like short and sweet responses, set this to a low amount! But if you're coding or having it write entire books or something, you may want to up this value."
+        },
+        "max_messages": {
+            "default": 200,
+            "description": "Maximum number of messages to keep in conversation history. If this amount of messages is exceeded, it will trim the context window even if the token limit hasn't been reached!"
+        },
+        "use_developer_role": {
+            "default": False,
+            "description": "Enables support for the special `developer` role (see [this page](https://developers.openai.com/api/docs/guides/text#message-roles-and-instruction-following)). **NOT ALL MODELS SUPPORT THIS!**. Things like the system prompt, the end prompt, and so on, will use the developer role instead of the system role if you enable this, which makes the model better able to understand the difference between openlumara's system instructions and your own messages. With this off, the endprompt uses the `user` role, so the model can get confused about whether the message is coming from you or the system. This fixes it, but as said, not all models support it. Models that don't support it will outright crash and return a blank response."
+        },
+        "custom_fields": {
+            "type": "object",
+            "default": {},
+            "description": "Additional custom fields to send with API requests. You can put anything in here that your chosen API supports!"
+        }
     },
     "model": {
-        "name": "",
-        "temperature": 0.7,
-        "enable_thinking": True,
-        "keep_reasoning_in_context": True,
-        "only_preserve_reasoning_for_current_agentic_loop": True,
-        "reasoning_effort": None,
-        "use_tools": True
+        "name": {
+            "default": "",
+            "description": "The name of the AI model to use."
+        },
+        "temperature": {
+            "default": 0.7,
+            "description": "Sampling temperature for the model (0.0 to 2.0)."
+        },
+        "enable_thinking": {
+            "default": True,
+            "description": "Enable reasoning (thinking) for the model."
+        },
+        "keep_reasoning_in_context": {
+            "default": True,
+            "description": "Keep the model's reasoning process in the conversation context. If you turn this off, the model won't remember its own thoughts, just the conclusions it drew. Can be useful for saving context."
+        },
+        "only_preserve_reasoning_for_current_agentic_loop": {
+            "default": True,
+            "description": "An 'agentic loop' is a chain of multiple thoughts, toolcalls, and so on, until the AI reaches a conclusion. When you make a request to the AI, such as `search the web for kitty facts and write a summary of it to a note`, it will first think, then do the web search, then think again (sometimes), then write it to a note, and then it will tell you that it's done. That's an agentic loop! So when you enable this, the AI will forget the thoughts it had in previous agentic loops, which is a huge context/token saver."
+        },
+        "reasoning_effort": {
+            "default": "none",
+            "type": "select",
+            "description": "The reasoning effort level for the model. This controls how deeply the model will think before answering, but it only works on koboldcpp and some cloud API's. Set to none to outright disable sending this with the request.",
+            "options": {
+                "none": 0,
+                "low": 1,
+                "medium": 2,
+                "high": 3,
+                "xhigh": 4,
+                "max": 5
+            }
+        },
+        "use_tools": {
+            "default": True,
+            "description": "Enable tool/function calling for the model. Turn this off if you just wanna talk to the AI and don't care for all this agentic stuff! Essentially turns it into a chatbot that can't actually do anything, but it can still answer your questions."
+        }
     },
     "channels": {
-        "enabled": [],
-        "disabled": [],
-        "settings": {}
+        "enabled": {
+            "default": [],
+            "description": "List of enabled channel names.",
+            "type": "list"
+        },
+        "disabled": {
+            "default": [],
+            "description": "List of disabled channel names.",
+            "type": "list"
+        },
+        "settings": {
+            "default": {},
+            "description": "Per-channel settings, keyed by channel name."
+        }
     },
     "user_channels": {
-        "path": "user_channels",
-        "enabled": [],
-        "disabled": [],
-        "settings": {}
+        "path": {
+            "default": "user_channels",
+            "description": "Directory path for user-defined channels."
+        },
+        "enabled": {
+            "default": [],
+            "description": "List of enabled user channel names.",
+            "type": "list"
+        },
+        "disabled": {
+            "default": [],
+            "description": "List of disabled user channel names.",
+            "type": "list"
+        },
+        "settings": {
+            "default": {},
+            "description": "Per-user-channel settings, keyed by channel name."
+        }
     },
     "modules": {
-        "enabled": [],
-        "disabled": [],
-        "settings": {}
+        "enabled": {
+            "default": [],
+            "description": "List of enabled module names.",
+            "type": "list"
+        },
+        "disabled": {
+            "default": [],
+            "description": "List of disabled module names.",
+            "type": "list"
+        },
+        "settings": {
+            "default": {},
+            "description": "Per-module settings, keyed by module name."
+        }
     },
     "user_modules": {
-        "path": "user_modules",
-        "enabled": [],
-        "disabled": [],
-        "settings": {}
+        "path": {
+            "default": "user_modules",
+            "description": "Directory path for user-defined modules."
+        },
+        "enabled": {
+            "default": [],
+            "description": "List of enabled user module names.",
+            "type": "list"
+        },
+        "disabled": {
+            "default": [],
+            "description": "List of disabled user module names.",
+            "type": "list"
+        },
+        "settings": {
+            "default": {},
+            "description": "Per-user-module settings, keyed by module name."
+        }
     }
 }
+
+def _flatten_settings(settings_dict):
+    """Recursively flattens a settings dictionary by extracting 'default' values."""
+    if isinstance(settings_dict, dict) and "default" in settings_dict:
+        return _flatten_settings(settings_dict["default"])
+    if isinstance(settings_dict, dict):
+        return {k: _flatten_settings(v) for k, v in settings_dict.items()}
+    return settings_dict
+
+default_config = _flatten_settings(core_settings_schema)
 
 DEFAULT_MODULES = (
     "tutorial",
@@ -391,12 +515,53 @@ def _get_file_checksum(filepath):
         return ""
 
 
+def _merge_core_settings(user_config, schema):
+    """
+    Recursively merges user_config with core_settings_schema.
+    This is analogous to _merge_module_settings but for core config sections.
+    """
+    if not isinstance(schema, dict):
+        return user_config
+
+    if isinstance(schema, dict) and "default" in schema:
+        if isinstance(user_config, dict) and "default" in user_config:
+            return schema["default"]
+        return user_config if user_config is not None else schema["default"]
+
+    if not isinstance(user_config, dict):
+        user_config = {}
+
+    new_config = {}
+    for k, v in schema.items():
+        if k in user_config:
+            new_config[k] = _merge_core_settings(user_config[k], v)
+        else:
+            new_config[k] = _flatten_settings(v)
+    return new_config
+
+def apply_core_settings_schema(user_config, schema):
+    """
+    Applies the core_settings_schema to user_config, merging defaults.
+    Returns a new dict with all schema keys present and defaults filled in.
+    """
+    if not isinstance(user_config, dict):
+        user_config = {}
+
+    result = {}
+    for section_key, section_schema in schema.items():
+        user_section = user_config.get(section_key, {})
+        if isinstance(section_schema, dict) and isinstance(user_section, dict):
+            result[section_key] = _merge_core_settings(user_section, section_schema)
+        else:
+            result[section_key] = _flatten_settings(section_schema)
+    return result
+
 def get_schema(*args, **kwargs):
     """
     Returns the config schema using the on-disk cache.
     Contains all possible module settings to allow persistence for disabled modules.
     """
-    schema = copy.deepcopy(default_config)
+    schema = _merge_core_settings({}, core_settings_schema)
     cache = _get_module_schema_cache()
 
     for section_key, section_cache in cache.items():
@@ -454,6 +619,62 @@ def get_module_structure():
 
     return metadata_registry
 
+
+def get_core_settings_structure():
+    """
+    Returns the core settings schema in a format compatible with the frontend's
+    settings UI. Similar to get_module_structure() but for core config sections.
+
+    Structure:
+    {
+        "section_name": {
+            "settings": { ... },  # Full schema with defaults, descriptions, types
+            "metadata": {
+                "doc": "...",  # Description of the section
+                "unsafe": False
+            }
+        }
+    }
+    """
+    structure = {}
+    
+    for section_key, section_schema in core_settings_schema.items():
+        if not isinstance(section_schema, dict):
+            continue
+        
+        settings = {}
+        description = ""
+        
+        for field_key, field_schema in section_schema.items():
+            if not isinstance(field_schema, dict):
+                continue
+            
+            # Extract description from the first field's schema if available
+            if not description and "description" in field_schema:
+                description = field_schema["description"]
+            
+            # Build the settings entry using the same structure as module settings
+            settings[field_key] = {
+                "default": field_schema.get("default"),
+                "description": field_schema.get("description", ""),
+                "type": field_schema.get("type"),
+                "options": field_schema.get("options"),
+                "unsafe": field_schema.get("unsafe", False),
+                "min": field_schema.get("min"),
+                "max": field_schema.get("max"),
+                "step": field_schema.get("step")
+            }
+        
+        structure[section_key] = {
+            "settings": settings,
+            "metadata": {
+                "doc": f"Configure {section_key.replace('_', ' ').title()}",
+                "unsafe": False
+            }
+        }
+    
+    return structure
+
 def sync_config(user_config, schema):
     """Recursively syncs structural keys from the schema."""
     if not isinstance(schema, dict) or not isinstance(user_config, dict):
@@ -493,14 +714,6 @@ def reconcile_lists(available_names, default_names, section_config):
         "disabled": sorted(list(disabled | new_disabled))
     }
 
-
-def _flatten_settings(settings_dict):
-    """Recursively flattens a settings dictionary by extracting 'default' values."""
-    if isinstance(settings_dict, dict) and "default" in settings_dict:
-        return _flatten_settings(settings_dict["default"])
-    if isinstance(settings_dict, dict):
-        return {k: _flatten_settings(v) for k, v in settings_dict.items()}
-    return settings_dict
 
 def _merge_module_settings(current_settings, module_defaults):
     """Recursively merges current_settings with module_defaults schema."""

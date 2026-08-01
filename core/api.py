@@ -207,7 +207,7 @@ class APIClient():
             req[key] = value
 
         reasoning_effort = core.config.get("model", {}).get("reasoning_effort")
-        if reasoning_effort:
+        if reasoning_effort != "none":
             req["reasoning_effort"] = reasoning_effort
 
         # allow inserting custom request fields

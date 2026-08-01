@@ -524,8 +524,10 @@ async def create_fastapi(channel):
 
     @app.get("/api/settings/get_module_info")
     async def get_module_info():
-        """Returns the schemas (descriptions, settings schemas, etc) for all modules"""
+        """Returns the schemas (descriptions, settings schemas, etc) for all modules and core config sections"""
         module_info = {}
+        
+        # Add module/channel settings schemas
         for module_name, module_data in core.config.get_module_structure().items():
             metadata = module_data.get("metadata", {})
             settings_schema = module_data.get("settings", {})
@@ -535,6 +537,16 @@ async def create_fastapi(channel):
                     "description": metadata.get("doc", ""),
                     "unsafe": metadata.get("unsafe", False),
                     "settings_schema": settings_schema
+                }
+        
+        # Add core config sections settings schemas
+        core_structure = core.config.get_core_settings_structure()
+        for section_name, section_data in core_structure.items():
+            if section_name not in module_info.keys():
+                module_info[section_name] = {
+                    "description": section_data.get("metadata", {}).get("doc", ""),
+                    "unsafe": section_data.get("metadata", {}).get("unsafe", False),
+                    "settings_schema": section_data.get("settings", {})
                 }
 
         return api_result(module_info)
