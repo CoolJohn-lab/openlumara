@@ -13,7 +13,7 @@
         align-items: center;
         gap: 8px;
         padding: 8px 12px;
-        background: var(--bg-tertiary);
+        background: var(--bg-secondary);
         cursor: pointer;
         user-select: none;
         font-size: 0.85rem;
@@ -46,7 +46,7 @@
     }
 
     .block {
-        background: var(--bg-tertiary);
+        background: var(--bg-secondary);
         border-radius: 0px 0px var(--radius-sm) var(--radius-sm);
         overflow: hidden;
         opacity: 1;
