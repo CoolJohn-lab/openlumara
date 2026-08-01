@@ -6,7 +6,6 @@
     <!-- Pending files -->
     <template x-if="$store.upload.files.length > 0">
         <div class="upload-section">
-            <h3 class="upload-section-title">Attachments</h3>
             <template x-for="(file, index) in $store.upload.files" :key="'pending-' + index">
                 <div class="item">
                     <div class="file-info">

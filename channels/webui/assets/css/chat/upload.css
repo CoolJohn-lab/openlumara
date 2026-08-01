@@ -17,6 +17,11 @@
         background: var(--bg-tertiary);
         border-radius: var(--radius-sm);
 
+        .file-info {
+            display: flex;
+            gap: var(--gap);
+        }
+
         .delete {
             margin-left: auto;
             background: none;
