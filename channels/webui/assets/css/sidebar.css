@@ -321,6 +321,10 @@
             background: var(--bg-secondary);
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent-glow), inset 0 0 0 1px var(--accent);
+
+            &:hover {
+                border-color: var(--accent);
+            }
         }
         .item:hover {
             background: var(--bg-secondary);
