@@ -38,7 +38,7 @@ core_settings_schema = {
     "api": {
         "url": {
             "default": "http://localhost:5001/v1",
-            "description": "The base URL for the API endpoint. Get this from your chosen software (i.e. [llamacpp](https://llama.app/), [koboldcpp](https://github.com/LostRuins/koboldcpp), [lemonade](https://lemonade-server.ai/), [lm studio](https://www.lmstudio.ai/home)) or from your cloud API provider."
+            "description": "The base URL for the API endpoint. Get this from your chosen software (such as [llamacpp](https://llama.app/), [koboldcpp](https://github.com/LostRuins/koboldcpp), [lemonade](https://lemonade-server.ai/), [lm studio](https://www.lmstudio.ai/home), or any other software you may prefer) or from your cloud API provider."
         },
         "key": {
             "default": "openlumara-dummy-key",
@@ -58,7 +58,7 @@ core_settings_schema = {
         },
         "use_developer_role": {
             "default": False,
-            "description": "Enables support for the special `developer` role (see [this page](https://developers.openai.com/api/docs/guides/text#message-roles-and-instruction-following)). **NOT ALL MODELS SUPPORT THIS!**. Things like the system prompt, the end prompt, and so on, will use the developer role instead of the system role if you enable this, which makes the model better able to understand the difference between openlumara's system instructions and your own messages. With this off, the endprompt uses the `user` role, so the model can get confused about whether the message is coming from you or the system. This fixes it, but as said, not all models support it. Models that don't support it will outright crash and return a blank response."
+            "description": "Enables the `developer` role for system prompts (see [this page](https://developers.openai.com/api/docs/guides/text#message-roles-and-instruction-following)). This helps the model distinguish between openlumara's instructions and your messages. Note: Not all models support this; unsupported models may crash if enabled.",
         },
         "custom_fields": {
             "type": "object",
