@@ -92,7 +92,14 @@
                                            updateSetting(setting, [...setting.value, newItem.trim()]);
                                            newItem = '';
                                        }
-                                   ">
+                                   "
+                                   @blur="
+                                       if (newItem.trim()) {
+                                           updateSetting(setting, [...setting.value, newItem.trim()]);
+                                           newItem = '';
+                                       }
+                                   "
+                                   >
                             <button type="button" class="add"
                                     @click="
                                         if (newItem.trim()) {

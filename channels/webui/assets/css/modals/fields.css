@@ -242,7 +242,9 @@
     .description {
         font-size: 0.8rem;
         color: var(--text-secondary);
-        margin-top: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
 
         a {
             color: var(--accent);
