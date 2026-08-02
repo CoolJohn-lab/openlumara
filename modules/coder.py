@@ -189,6 +189,8 @@ class Coder(core.module.Module):
     # -----------------------------
     async def _check_syntax(self, code: str, file_path: str):
         """verifies code for syntax errors without writing it to disk"""
+        errors = []
+
         lang = tslp.detect_language_from_path(file_path)
         if not lang or lang in ("vimdoc"):
             # that means treesitter doesn't support the language,
@@ -198,8 +200,11 @@ class Coder(core.module.Module):
             return []
 
         result = tslp.process(code, tslp.ProcessConfig(language=lang, diagnostics=True, structure=False))
+        if not result:
+            # was likely an empty file, or failed to parse
+            errors.append("Failed to parse the file for syntax errors. For safety, the file was not written to disk.")
+            return errors
 
-        errors = []
         if result.diagnostics:
             for diag in result.diagnostics:
                 errors.append(f"Line {diag.span.start_line + 1}, Col {diag.span.start_column + 1}: {diag.message}")
@@ -226,6 +231,9 @@ class Coder(core.module.Module):
             imports=True,
             comments=False
         ))
+        if not extraction:
+            # was likely an empty file, or failed to parse
+            return None
 
         data = {}
         data["symbols"] = []
@@ -478,14 +486,18 @@ class Coder(core.module.Module):
         content_lines = content.split("\n")
         total_lines = len(content_lines)
 
-        # clamp line numbers to valid ranges
-        if line_start < 1:
-            line_start = 1
-        if line_end > total_lines:
-            line_end = total_lines
-
         # make sure it's 0-indexed
         line_start = line_start-1
+
+        # clamp line start to above 1
+        if line_start < 0:
+            line_start = 1
+
+        # change a line end of -1 to the actual last line
+        if line_end == -1 or line_end > total_lines:
+            line_end = total_lines
+        elif line_end < 1:
+            line_end = 1
 
         # now get only the requested part
         content_partial = content_lines[line_start:line_end]
