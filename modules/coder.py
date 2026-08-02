@@ -308,6 +308,9 @@ class Coder(core.module.Module):
         sandbox_path = await self._get_full_sandbox_path(sandbox)
         target_path = await self._get_sandbox_subpath(sandbox, dir_path or '.')
 
+        if pattern.strip() in ("*", "**", "."):
+            return self.result("search is too broad! try searching for specific file types, or search by keywords", success=False)
+
         try:
             # remove the sandbox path itself from the string in case the AI decided to add it
             if pattern.startswith(sandbox):
@@ -472,7 +475,7 @@ class Coder(core.module.Module):
             # FAWK KUAH
             return self.result(str(e), success=False)
 
-    async def file_read(self, sandbox: str, path: str, line_start: int = 1, line_end: int = -1):
+    async def file_read(self, sandbox: str, path: str, line_start: int = None, line_end: int = None):
         """reads a file, or a portion of the file. use line_start and line_end to read in chunks."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
@@ -490,6 +493,23 @@ class Coder(core.module.Module):
         content_lines = content.split("\n")
         total_lines = len(content_lines)
 
+        max_lines = self.config.get("global_line_limit")
+
+        # filesize gate
+        if line_start is None and line_end is None:
+            if total_lines <= max_lines:
+                # Allow plain reads for small files
+                line_start = 1
+                line_end = total_lines
+            else:
+                return self.result(f"File is too large to read in full! ({total_lines} lines). Read it in chunks.", success=False)
+
+        # default ranges
+        if line_start is None:
+            line_start = 1
+        if line_end is None:
+            line_end = -1
+
         # make sure it's 0-indexed
         line_start = line_start-1
 
@@ -504,7 +524,6 @@ class Coder(core.module.Module):
             line_end = 1
 
         # enforce hard limit on chunk size
-        max_lines = self.config.get("global_line_limit")
         hit_line_limit = line_end - line_start > max_lines
         if hit_line_limit:
             line_end = line_start + max_lines
