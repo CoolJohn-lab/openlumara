@@ -13,15 +13,37 @@ class Coder(core.module.Module):
     # ~ Rose22
 
     settings = {
-        # sandbox mode
+        "read-only": {
+            "default": False,
+            "description": "Disables all operations that could modify your code or your filesystem. You can use `/coder readonly` to quickly toggle this during sessions."
+        },
+
+        # paths
         "sandbox_paths": {
             "default": ["~/coder"],
-            "description": "Paths to folders you want the coder to have access to. You can use the `~` character to refer to your home folder, such as `/home/you` on linux, `C:\\Users\\You` on windows"
+            "description": "Paths to folders you want the coder to have access to. You can use the `~` character to refer to your home folder, such as `/home/you` on linux, /Users/You on mac, `C:\\Users\\You` on windows"
         },
+
         "template_paths": {
             "default": [],
-            "description": "Templates are files that the coder can read at any time when requested, to show the AI example code. Openlumara comes bundled with templates for creating your own modules and channels, and you can add your own template folders here.\n\n**TIP**: To vibecode your own modules or channels, tell the AI to read the module or channel template in your prompt. Example: `read the openlumara channel template and make me a basic terminal user interface`"
+            "description": "Templates are special files that the coder can read from anywhere at any time when requested, in order to show example code to the AI. You can define folders to load such templates from here!"
         },
+        "enable_builtin_templates": {
+            "default": True,
+            "description": "Openlumara comes bundled with hand-written templates for creating your own modules and channels! Enable them here.\n\n**TIP**: To vibecode your own modules or channels, tell the AI to read the module or channel template in your prompt. Example: `read the openlumara channel template and make me a basic terminal user interface`"
+        },
+
+        "use_coding_prompt": {
+            "default": False,
+            "description": "If enabled, will allow you to specify a special prompt that instructs the AI on your preferred coding practices and guidelines."
+        },
+        "coding_prompt": {
+            "type": "long_text",
+            "default": "",
+            "depends": "use_coding_prompt"
+        },
+
+        # flags
         "insert_sandbox_paths_into_system_prompt": {
             "default": True,
             "description": "Puts the list of sandboxes into the AI's system prompt so that it is always aware of which paths it can access. Recommended!"
@@ -29,12 +51,7 @@ class Coder(core.module.Module):
         "add_sandbox_contents_to_sandbox_list": {
             "default": False,
             "description": "Puts a list of top-level folders within each sandbox into the system prompt. This greatly speeds up sandbox exploration, and is not a recursive list - it only lists the folders that are directly at the root level of each sandbox.",
-        },
-
-        # flags
-        "read-only": {
-            "default": False,
-            "description": "Disables all operations that could modify your code or your filesystem"
+            "depends": "insert_sandbox_paths_into_system_prompt"
         },
 
         # blacklists
@@ -45,6 +62,7 @@ class Coder(core.module.Module):
     }
 
     # the coder likes sitting on a tree... of code
+    # the tree is nice and green and it also tells the coder whether it made any oopsies
     dependencies = [
         "tree-sitter",
         "tree-sitter-language-pack",
@@ -61,6 +79,9 @@ class Coder(core.module.Module):
         if self.config.get("read-only"):
             self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_create", "folder_delete"])
 
+        if self.config.get("insert_sandbox_paths_into_system_prompt"):
+            self.disabled_tools.append("list_sandboxes")
+
         # still figuring out how to best guide the AI in when to use file_inspect over file_read.
         # it's a very tough thing since most LLM's are trained to just read entire files
         # and are inclined to do so
@@ -69,43 +90,47 @@ class Coder(core.module.Module):
     async def on_system_prompt(self):
         final_output = []
 
-        sandboxes = await self._get_sandbox_paths()
-        if sandboxes:
-            output_str = "## Sandboxes you have access to:\n"
-            output_str += "\n".join([f"- {path}" for path in sandboxes])
-            final_output.append(output_str)
-
         templates = await self._get_templates()
         if templates:
             output_str = "## Templates you can read using read_template:\n"
             output_str += "\n".join([f"- {template}" for template in templates])
             final_output.append(output_str)
 
-        if self.config.get("add_sandbox_contents_to_sandbox_list"):
-            for sandbox in sandboxes:
-                output_str = f"### Files within sandbox '{sandbox}':"
-                full_path = await self._get_full_sandbox_path(sandbox)
-                folder_list = os.listdir(full_path)
-
-                files = []
-                folders = []
-                for file in folder_list:
-                    if os.path.isdir(os.path.join(full_path, file)):
-                        folders.append(file)
-                    else:
-                        files.append(file)
-
-                folders.sort()
-                files.sort()
-
-                if folders:
-                    output_str += "\n#### Folders:\n"
-                    output_str += "\n".join([f"- {folder}" for folder in folders])
-                if files:
-                    output_str += "\n#### Files:\n"
-                    output_str += "\n".join([f"- {file}" for file in files])
-
+        if self.config.get("insert_sandbox_paths_into_system_prompt"):
+            sandboxes = await self._get_sandbox_paths()
+            if sandboxes:
+                output_str = "## Sandboxes you have access to:\n"
+                output_str += "\n".join([f"- {path}" for path in sandboxes])
                 final_output.append(output_str)
+
+            if self.config.get("add_sandbox_contents_to_sandbox_list"):
+                for sandbox in sandboxes:
+                    output_str = f"### Files within sandbox '{sandbox}':"
+                    full_path = await self._get_full_sandbox_path(sandbox)
+                    folder_list = os.listdir(full_path)
+
+                    files = []
+                    folders = []
+                    for file in folder_list:
+                        if os.path.isdir(os.path.join(full_path, file)):
+                            folders.append(file)
+                        else:
+                            files.append(file)
+
+                    folders.sort()
+                    files.sort()
+
+                    if folders:
+                        output_str += "\n#### Folders:\n"
+                        output_str += "\n".join([f"- {folder}" for folder in folders])
+                    if files:
+                        output_str += "\n#### Files:\n"
+                        output_str += "\n".join([f"- {file}" for file in files])
+
+                    final_output.append(output_str)
+
+        if self.config.get("use_coding_prompt") and self.config.get("coding_prompt"):
+            final_output.append(f"## Coding Guidelines\nYOU MUST ALWAYS follow these guidelines while using the coder:\n{self.config.get('coding_prompt')}")
 
         if final_output:
             return "\n\n".join(final_output)
@@ -233,16 +258,18 @@ class Coder(core.module.Module):
     async def _get_template_folders(self):
         template_folders = list(self.config.get("template_paths"))
 
-        # always add the internal templates path to the list of template folders
-        template_folders.insert(0, self.builtin_templates_path)
-        return template_folders
+        # add the internal templates path to the list of template folders
+        if self.config.get("enable_builtin_templates"):
+            template_folders.insert(0, self.builtin_templates_path)
+
+        return template_folders or []
 
     async def _get_templates(self):
         all_templates = []
         template_folders = await self._get_template_folders()
 
         if not template_folders:
-            raise Exception("no template folders were configured! this should never happen, since the builtin one is always included. notify the developer!")
+            return []
 
         for folder in template_folders:
             # resolve relative paths to the openlumara root,
@@ -261,6 +288,9 @@ class Coder(core.module.Module):
     # ----------------------
     # tools: file navigation
     # ----------------------
+    async def list_sandboxes(self):
+        return self.result(await self._get_sandbox_paths())
+
     async def glob(self, sandbox: str, pattern: str, dir_path=None):
         """globs a given path for your desired files. does not support regex. paths are relative to sandbox root."""
         sandbox_path = await self._get_full_sandbox_path(sandbox)
