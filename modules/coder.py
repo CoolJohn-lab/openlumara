@@ -7,7 +7,7 @@ import glob
 import tree_sitter_language_pack as tslp
 
 class Coder(core.module.Module):
-    """Allows your AI to code! Validates code syntax on writing"""
+    """Lets your AI write code within sandboxes, without using a shell. Validates code syntax before writing to disk to protect your code from breaking."""
 
     # The coder module, now manually rewritten and free of any AI slop :)
     # ~ Rose22
@@ -16,7 +16,11 @@ class Coder(core.module.Module):
         # sandbox mode
         "sandbox_paths": {
             "default": ["~/coder"],
-            "description": "Paths you want the coder to have access to. You can use the `~` character to refer to your home folder, such as `/home/you` on linux, `C:\\Users\\You` on windows"
+            "description": "Paths to folders you want the coder to have access to. You can use the `~` character to refer to your home folder, such as `/home/you` on linux, `C:\\Users\\You` on windows"
+        },
+        "template_paths": {
+            "default": [],
+            "description": "Templates are files that the coder can read at any time when requested, to show the AI example code. Openlumara comes bundled with templates for creating your own modules and channels, and you can add your own template folders here.\n\n**TIP**: To vibecode your own modules or channels, tell the AI to read the module or channel template in your prompt. Example: `read the openlumara channel template and make me a basic terminal user interface`"
         },
         "insert_sandbox_paths_into_system_prompt": {
             "default": True,
@@ -47,6 +51,65 @@ class Coder(core.module.Module):
     ]
 
     regex_timeout = 3
+    builtin_templates_path = "modules/coder/templates"
+
+    # -------------
+    # events
+    # -------------
+    async def on_ready(self):
+        # enable/disable tools based on selected modes
+        if self.config.get("read-only"):
+            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_create", "folder_delete"])
+
+        # still figuring out how to best guide the AI in when to use file_inspect over file_read.
+        # it's a very tough thing since most LLM's are trained to just read entire files
+        # and are inclined to do so
+        self.disabled_tools.append("file_outline")
+
+    async def on_system_prompt(self):
+        final_output = []
+
+        sandboxes = await self._get_sandbox_paths()
+        if sandboxes:
+            output_str = "## Sandboxes you have access to:\n"
+            output_str += "\n".join([f"- {path}" for path in sandboxes])
+            final_output.append(output_str)
+
+        templates = await self._get_templates()
+        if templates:
+            output_str = "## Templates you can read using read_template:\n"
+            output_str += "\n".join([f"- {template}" for template in templates])
+            final_output.append(output_str)
+
+        if self.config.get("add_sandbox_contents_to_sandbox_list"):
+            for sandbox in sandboxes:
+                output_str = f"### Files within sandbox '{sandbox}':"
+                full_path = await self._get_full_sandbox_path(sandbox)
+                folder_list = os.listdir(full_path)
+
+                files = []
+                folders = []
+                for file in folder_list:
+                    if os.path.isdir(os.path.join(full_path, file)):
+                        folders.append(file)
+                    else:
+                        files.append(file)
+
+                folders.sort()
+                files.sort()
+
+                if folders:
+                    output_str += "\n#### Folders:\n"
+                    output_str += "\n".join([f"- {folder}" for folder in folders])
+                if files:
+                    output_str += "\n#### Files:\n"
+                    output_str += "\n".join([f"- {file}" for file in files])
+
+                final_output.append(output_str)
+
+        if final_output:
+            return "\n\n".join(final_output)
+        return None
 
     # -------------------------------
     # helper functions: sandbox stuff
@@ -60,6 +123,10 @@ class Coder(core.module.Module):
         paths = self.config.get("sandbox_paths")
         if not paths:
             return []
+
+        # create them if they dont exist
+        for path in paths:
+            os.makedirs(os.path.expanduser(path).rstrip(os.path.sep), exist_ok=True)
 
         # strip the paths of separators at the end so that os.path.basename doesnt return a blank string (why, python?)
         paths = [path.rstrip(os.path.sep) for path in paths]
@@ -160,57 +227,36 @@ class Coder(core.module.Module):
 
         return data
 
-    # -------------
-    # events
-    # -------------
-    async def on_ready(self):
-        # enable/disable tools based on selected modes
-        if self.config.get("read-only"):
-            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_create", "folder_delete"])
+    # ---------------------------
+    # helper functions: templates
+    # ---------------------------
+    async def _get_template_folders(self):
+        template_folders = list(self.config.get("template_paths"))
 
-        # still figuring out how to best guide the AI in when to use file_inspect over file_read.
-        # it's a very tough thing since most LLM's are trained to just read entire files
-        # and are inclined to do so
-        self.disabled_tools.append("file_outline")
+        # always add the internal templates path to the list of template folders
+        template_folders.insert(0, self.builtin_templates_path)
+        return template_folders
 
-    async def on_system_prompt(self):
-        final_output = []
+    async def _get_templates(self):
+        all_templates = []
+        template_folders = await self._get_template_folders()
 
-        sandboxes = await self._get_sandbox_paths()
-        if sandboxes:
-            output_str = "## Sandboxes you have access to:\n"
-            output_str += "\n".join([f"- {path}" for path in sandboxes])
-            final_output.append(output_str)
+        if not template_folders:
+            raise Exception("no template folders were configured! this should never happen, since the builtin one is always included. notify the developer!")
 
-        if self.config.get("add_sandbox_contents_to_sandbox_list"):
-            for sandbox in sandboxes:
-                output_str = f"### Files within sandbox '{sandbox}':"
-                full_path = await self._get_full_sandbox_path(sandbox)
-                folder_list = os.listdir(full_path)
+        for folder in template_folders:
+            # resolve relative paths to the openlumara root,
+            # absolute paths to their absolute locations
+            folder_path = core.get_path(folder)
 
-                files = []
-                folders = []
-                for file in folder_list:
-                    if os.path.isdir(os.path.join(full_path, file)):
-                        folders.append(file)
-                    else:
-                        files.append(file)
+            try:
+                templates = os.listdir(folder_path)
+            except Exception as e:
+                return self.result(str(e), success=False)
 
-                folders.sort()
-                files.sort()
+            all_templates.extend(templates)
 
-                if folders:
-                    output_str += "\n#### Folders:\n"
-                    output_str += "\n".join([f"- {folder}" for folder in folders])
-                if files:
-                    output_str += "\n#### Files:\n"
-                    output_str += "\n".join([f"- {file}" for file in files])
-
-                final_output.append(output_str)
-
-        if final_output:
-            return "\n\n".join(final_output)
-        return None
+        return all_templates
 
     # ----------------------
     # tools: file navigation
@@ -252,7 +298,6 @@ class Coder(core.module.Module):
 
             return self.result(results)
         except Exception as e:
-            # LAWK MUAH
             return self.result(str(e), success=False)
 
     async def grep_in_folder(self, sandbox: str, dir_path: str, regex_pattern: str):
@@ -287,7 +332,6 @@ class Coder(core.module.Module):
                                         "snippet": line.rstrip()
                                     })
                     except Exception as e:
-                        # KAWK KUAH
                         pass
 
             if matches:
@@ -453,6 +497,32 @@ class Coder(core.module.Module):
             # FKAWK SUAH
             return self.result(str(e), success=False)
 
+    async def read_template(self, template_name: str):
+        template_folders = await self._get_template_folders()
+        if not template_folders:
+            raise Exception("no template folders were configured! this should never happen, since the builtin one is always included. notify the developer!")
+
+        for folder in template_folders:
+            # resolve relative paths to the openlumara root,
+            # absolute paths to their absolute locations
+            folder_path = core.get_path(folder)
+
+            try:
+                templates = os.listdir(folder_path)
+            except Exception as e:
+                # LAWK FUAH
+                return self.result(str(e), success=False)
+
+            if template_name in templates:
+                try:
+                    with open(os.path.join(folder_path, template_name), 'r', encoding="utf-8") as f:
+                        return self.result(f.read())
+                except Exception as e:
+                    # FAWK MUAH
+                    return self.result(str(e), success=False)
+
+        return self.result("Template not found!", success=False) 
+
     # --------------------
     # tools: file writing
     # --------------------
@@ -491,3 +561,24 @@ class Coder(core.module.Module):
            return self.result(str(e), success=False)
 
        return self.result(f"Successfully edited file {path}")
+
+    # ---------------------
+    # user-facing commands
+    # ---------------------
+    @core.module.command("coder", help={
+       "readonly": "toggle read-only mode"
+    })
+    async def cmd_coder(self, args: list):
+        if len(args) == 0:
+            return "please specify a sub-command (see /help coder)"
+
+        match args[0]:
+            case "readonly":
+                current_state = self.config.get("read-only")
+                self.config.set("read-only", not current_state)
+                await self.manager.reload_module(self.name)
+
+                if current_state:
+                    return "read-only mode disabled"
+                else:
+                    return "read-only mode enabled"
