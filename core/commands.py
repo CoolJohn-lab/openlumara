@@ -242,17 +242,26 @@ class Commands:
     def __init__(self, channel):
         self.channel = channel
 
-    async def _get_help(self):
+    async def _get_help(self, args: list = []):
         # Get automated command help grouped by module
         output = []
 
         cmd_help = core.commands.get_commands(self.channel.manager.modules)
         if cmd_help:
-            for category, commands in cmd_help.items():
-                output.append(f"== {category} ==")
-                for command, desc in commands.items():
+            if args:
+                module_name = args[0]
+
+                # get a specific module's help
+                if not module_name in cmd_help.keys():
+                    return "that's not a valid topic! check /help"
+                
+                for command, desc in cmd_help[module_name].items():
                     output.append(f"{command:<30} {desc}")
-                output.append("") # newline
+
+                return "\n".join(output)
+            else:
+                topics = "\n".join([f"- {topic}" for topic in cmd_help.keys()])
+                return f"use /help with one of the following topics:\n{topics}\n\nexample: /help core"
 
         return "\n".join(output)
 
@@ -333,7 +342,7 @@ class Commands:
             #     self._last_cmd_was_temporary = True
             #     return "Turn undone."
             case "help":
-                return await self._get_help()
+                return await self._get_help(args)
             case "ping":
                 return "pong!"
             case "new":
