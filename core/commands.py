@@ -659,7 +659,7 @@ class Commands:
                                     # Bind the method to the instance and call it
                                     bound_method = method.__get__(module_inst, registered_cls)
                                     try:
-                                        return await bound_method(cmd[1:])
+                                        return await bound_method(args)
                                     except Exception as e:
                                         self.channel.log_error("error while executing command", e)
 
