@@ -17,6 +17,10 @@ class Coder(core.module.Module):
             "default": False,
             "description": "Disables all operations that could modify your code or your filesystem. You can use `/coder readonly` to quickly toggle this during sessions."
         },
+        "global_line_limit": {
+            "default": 1000,
+            "description": "Hard limit on the amount of lines the AI is allowed to read at once. Greatly helps reduce token usage!"
+        },
 
         # paths
         "sandbox_paths": {
@@ -468,8 +472,8 @@ class Coder(core.module.Module):
             # FAWK KUAH
             return self.result(str(e), success=False)
 
-    async def file_read(self, sandbox: str, path: str, line_start: int, line_end: int):
-        """reads a file, or a portion of the file. use line_start and line_end to target specific classes and functions."""
+    async def file_read(self, sandbox: str, path: str, line_start: int = 1, line_end: int = -1):
+        """reads a file, or a portion of the file. use line_start and line_end to read in chunks."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
         # protect against tocccc touh
@@ -499,19 +503,22 @@ class Coder(core.module.Module):
         elif line_end < 1:
             line_end = 1
 
+        # enforce hard limit on chunk size
+        max_lines = self.config.get("global_line_limit")
+        hit_line_limit = line_end - line_start > max_lines
+        if hit_line_limit:
+            line_end = line_start + max_lines
+
         # now get only the requested part
         content_partial = content_lines[line_start:line_end]
 
         # tell the AI what got truncated
-        truncation_note = None
-        if line_start > 0 and line_end < total_lines:
-            truncation_note = f"[Top {line_start} lines and bottom {total_lines - line_end} lines omitted. Showing lines {line_start+1}-{line_end} of {total_lines} total.]"
-        elif line_start > 0:
-            truncation_note = f"[Top {line_start} lines omitted. Showing lines {line_start+1}-{line_end} of {total_lines} total.]"
-        elif line_end < total_lines:
-            truncation_note = f"[Bottom {total_lines - line_end} lines omitted. Showing lines {line_start+1}-{line_end} of {total_lines} total.]"
+        remaining = total_lines - line_end
+        truncated = remaining > 0 or hit_line_limit
+        truncation_note = f"Showing lines {line_start+1}-{line_end} of {total_lines}. {remaining} lines remaining." if truncated else None
+        if hit_line_limit:
+            truncation_note += f" WARNING: request clamped to global line limit of {max_lines} lines"
 
-        truncated = truncation_note is not None
         result = {"content": "\n".join(content_partial), "truncated": truncated}
         if truncated:
             result["truncation_note"] = truncation_note
