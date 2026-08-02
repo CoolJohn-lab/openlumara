@@ -20,7 +20,7 @@
     aria-label="Message input"
     @paste="$store.upload.pasteImage($event)"
     @keydown.enter="
-        if (!$event.shiftKey) {
+        if (!$event.shiftKey && !$store.ui.isMobile) {
             $event.preventDefault();
             if (!$store.chat.user_input) { return; }
 
