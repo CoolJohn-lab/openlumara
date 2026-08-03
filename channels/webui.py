@@ -41,7 +41,8 @@ class Webui(core.channel.Channel):
         "itsdangerous",
         "websockets",
         "jinja2",
-        "uvicorn"
+        "uvicorn",
+        "python-multipart"
     ]
 
     # these settings are taken straight from the previous webUI,
