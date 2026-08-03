@@ -117,23 +117,7 @@ class Webui(core.channel.Channel):
             "description": "How many days to stay logged in for",
             "default": 30,
             "depends": "require_login"
-        },
-        "debug_mode": {
-            "description": "When enabled, this will show a ton of webui-related messages in the server console. Very useful for debugging webui related issues!",
-            "default": False
-        },
-        "log_level": {
-            "type": "select",
-            "description": "How detailed the HTTP logs should be in the console. You can usually leave this as default, unless you want to see details about all the incoming/outgoing traffic to/from the webserver",
-            "default": "error",
-            "options": {
-                "critical": "Only show critical errors",
-                "error": "Show errors of any kind",
-                "warning": "Show only warnings, not errors",
-                "info": "Show useful information",
-                "debug": "Show debugging information"
-            }
-        },
+        }
     }
 
     async def _verify_credentials(self, username: str, password: str) -> bool:
@@ -148,19 +132,15 @@ class Webui(core.channel.Channel):
         return secrets.compare_digest(password, correct_password)
 
     async def on_ready(self):
-        debug = self.config.get("debug_mode")
-
         # paths
         self.path = core.get_path(os.path.join("channels", "webui"))
         self.template_path = os.path.join(self.path, "templates")
         self.assets_path = os.path.join(self.path, "assets")
 
         # fastapi-specific instances
-        if debug: self.log(self.name, "Loading templates..")
         self.templates = fastapi.templating.Jinja2Templates(self.template_path)
 
         # aaand create it
-        if debug: self.log(self.name, "Creating FastAPI instance..")
         self.app = await create_fastapi(self)
 
         # determine network mode
@@ -192,7 +172,7 @@ class Webui(core.channel.Channel):
         self.log("webui", f"Starting WebUI on {self.url}")
 
         # serve the app using uvicorn
-        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level=self.config.get("log_level"))
+        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="error")
         self.server = uvicorn.Server(config)
 
         await self.server.serve()
@@ -338,10 +318,7 @@ async def create_fastapi(channel):
         max_age=session_lifetime_days * 86400
     )
 
-    debug = channel.config.get("debug_mode")
-
     # serve asset files (formerly /static) using fastAPI's mount()
-    if debug: channel.log(channel.name, "Serving assets..") 
     app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")
 
     # ------------------
@@ -781,9 +758,6 @@ async def create_fastapi(channel):
     # ------------------
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: fastapi.WebSocket):
-        if debug:
-            channel.log(channel.name, "Attempting to connect websocket..")
-
         # WebSocket auth check
         if channel.config.get("require_login", False):
             session_cookie = websocket.cookies.get("session")
@@ -807,14 +781,9 @@ async def create_fastapi(channel):
         ws_mgr = channel.websocket_manager
         await ws_mgr.connect(websocket)
 
-        if debug:
-            channel.log(channel.name, "Websocket connection accepted")
-
         try:
             while True:
                 data_text = await websocket.receive_text()
-                if debug:
-                    channel.log(channel.name, f"websocket data:  {data_text}")
 
                 try:
                     data = json.loads(data_text)
@@ -990,9 +959,6 @@ class WebSocketManager:
         self.webui_ready = True
 
     async def broadcast(self, message: dict):
-        if self.channel.config.get("debug_mode"):
-            self.channel.log(self.channel.name, f"WS Broadcast: {message}")
-
         disconnected = []
         for connection in self.active_connections:
             try:

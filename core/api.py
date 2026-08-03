@@ -723,12 +723,16 @@ class APIClient():
 
         try:
             # get alphabetically sorted model list
-            models = await self._AI.models.list()
-            models_list = [model.id for model in models.data]
-            models_list.sort()
+            models_model = await self._AI.models.list()
+
+            # commented out but this is going to allow much more detailed model information once i get to implementing it
+            # models = models_model.model_dump()
+
+            model_list = [model.id for model in models_model.data]
+            model_list.sort()
 
         except Exception as e:
             self.manager.log_error("error while retrieving model list", e)
             return []
 
-        return models_list
+        return model_list

@@ -9,9 +9,22 @@ class Chat:
         self.channel = channel
 
         # Auto-migrate if old format detected
-        # old_chats_file = core.get_data_path(f"{channel.name}_chats.json")
-        # if os.path.exists(old_chats_file):
-        #     self._migrate_if_needed()
+        old_chats_file = core.get_data_path(f"{channel.name}_chats.json")
+        if os.path.exists(old_chats_file):
+            if not core.proceed_migration:
+                print("-"*40)
+                print("Found old chat history files! In order for them to work in the new version of openlumara, they need to be migrated.")
+                print(f"\033[1;31m!! PLEASE MAKE A BACKUP OF YOUR DATA FOLDER, SO THAT YOU WON'T POTENTIALLY LOSE YOUR CHATS !!\033[0m")
+                print()
+                print("Then, when you're ready, type MIGRATE in caps into this prompt:")
+                while not core.proceed_migration:
+                    confirm = input("migrate?> ")
+                    if confirm.strip() == "MIGRATE":
+                        core.proceed_migration = True
+
+                    print("Type 'MIGRATE' exactly in capital letters")
+                    
+            self._migrate_if_needed()
 
         self.data = core.storage.StorageList(os.path.join(self.path, "index"), "msgpack")
         self.messages = None # initialized by autoload()
@@ -71,14 +84,14 @@ class Chat:
         if not os.path.exists(old_chats_file):
             return  # No old format detected
         
-        self.channel.log(self.channel.name, f"[MIGRATE] Old format detected for '{self.channel.name}', migrating...")
+        print(f"[MIGRATE] Old format detected for '{self.channel.name}', migrating...")
         
         # Read old chats
         with open(old_chats_file, 'r', encoding='utf-8') as f:
             old_chats = json.load(f)
         
         if not isinstance(old_chats, list):
-            self.channel.log(self.channel.name, f"[MIGRATE] Invalid old format, skipping")
+            print(f"[MIGRATE] Invalid old format, skipping")
             return
         
         # Create new directory structure
@@ -139,9 +152,9 @@ class Chat:
         if os.path.exists(old_chats_file):
             backup_name = f"{self.channel.name}_chats.json.bak"
             shutil.move(old_chats_file, os.path.join(backup_dir, backup_name))
-            self.channel.log(self.channel.name, f"[MIGRATE] Backed up old chats file to {backup_name}")
+            print(f"[MIGRATE] Backed up old chats file to {backup_name}")
         
-        self.channel.log(self.channel.name, f"[MIGRATE] Migrated {len(new_chats)} chats for '{self.channel.name}'")
+        print(f"[MIGRATE] Migrated {len(new_chats)} chats for '{self.channel.name}'")
 
     async def update_timestamp(self):
         if self.current is None:
