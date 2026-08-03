@@ -18,6 +18,7 @@ THEME_STORE = {
                 this.apply(this.family, this.mode);
             });
         });
+
     },
 
     // Load a specific theme family if not already cached
@@ -69,6 +70,16 @@ THEME_STORE = {
             }
         }
 
+        // apply font family
+        const fontFam = localStorage.getItem('fontFamily');
+        if (fontFam) {
+            this.setFont(fontFam);
+        }
+
+        // apply font size
+        const fontSize = localStorage.getItem('fontSize');
+        root.style.setProperty('--font-size-base', `${fontSize}px`);
+
         // Apply theme vars on top of base
         for (const [varName, value] of Object.entries(finalTheme)) {
             root.style.setProperty(varName, value);
@@ -108,11 +119,19 @@ THEME_STORE = {
 
         if (font && font !== 'default') {
             this.loadGoogleFont(font);
-            root.style.setProperty('--font-family', `'${font}', sans-serif`);
+            root.style.setProperty('--font-primary', `'${font}', sans-serif`);
             root.style.setProperty('--code-font', `'${font}', monospace`);
         } else {
-            root.style.setProperty('--font-family', "Arial, sans-serif");
+            root.style.setProperty('--font-primary', "Arial, sans-serif");
         }
+    },
+    
+    // Set font size
+    setFontSize(size) {
+        localStorage.setItem('fontSize', size);
+
+        const root = document.documentElement;
+        root.style.setProperty('--font-size-base', `${this.fontSize}px`);
     },
 
     // Load Google Font
