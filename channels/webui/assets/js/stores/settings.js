@@ -14,7 +14,7 @@ SETTINGS_STORE = {
     
     // --- Feature Flags ---
     showUnsafe: false,
-    expandReasoning: JSON.parse(localStorage.getItem('reasoningExpandedByDefault') || 'false'),
+    expandReasoning: JSON.parse(localStorage.getItem('expandReasoning') || 'false'),
     
     // --- Model Cache ---
     cachedModels: null,
