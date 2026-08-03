@@ -4,6 +4,7 @@ import importlib
 import shutil
 import regex
 import glob
+import fnmatch
 import tree_sitter_language_pack as tslp
 
 class Coder(core.module.Module):
@@ -303,13 +304,15 @@ class Coder(core.module.Module):
     async def list_sandboxes(self):
         return self.result(await self._get_sandbox_paths())
 
-    async def glob(self, sandbox: str, pattern: str, dir_path=None):
+    async def glob(self, sandbox: str, pattern: str, sub_path=None, recursive: bool = True):
         """globs a given path for your desired files. does not support regex. paths are relative to sandbox root."""
         sandbox_path = await self._get_full_sandbox_path(sandbox)
-        target_path = await self._get_sandbox_subpath(sandbox, dir_path or '.')
+        target_path = await self._get_sandbox_subpath(sandbox, sub_path or '.')
 
-        if pattern.strip() in ("*", "**", "."):
+        if recursive and pattern.strip() in ("*", "**", "."):
             return self.result("search is too broad! try searching for specific file types, or search by keywords", success=False)
+
+        folder_blacklist = self.config.get("folder_blacklist")
 
         try:
             # remove the sandbox path itself from the string in case the AI decided to add it
@@ -317,18 +320,18 @@ class Coder(core.module.Module):
                 pattern = pattern[len(sandbox):]
 
             # if the pattern doesn't contain **, prefix with **/ for recursive matching
-            if '**' not in pattern and '/' not in pattern:
-                pattern = f"**/{pattern}"
-            elif '/' in pattern and '**' not in pattern:
-                pattern = f"**/{pattern}"
+            if recursive:
+                if '**' not in pattern and '/' not in pattern:
+                    pattern = f"**/{pattern}"
+                elif '/' in pattern and '**' not in pattern:
+                    pattern = f"**/{pattern}"
 
             matches = glob.glob(
                 os.path.join(target_path, pattern),
-                recursive=True
+                recursive=recursive
             )
 
             results = []
-            folder_blacklist = self.config.get("folder_blacklist")
             for match in matches:
                 rel_path = os.path.relpath(match, target_path)
 
@@ -345,15 +348,18 @@ class Coder(core.module.Module):
         except Exception as e:
             return self.result(str(e), success=False)
 
-    async def grep_in_folder(self, sandbox: str, dir_path: str, regex_pattern: str):
+    async def folder_grep(self, sandbox: str, sub_path: str, regex_pattern: str, case_sensitive=False, context: int = 0, file_extensions: list = None, max_matches: int = 100):
+        """Searches for regex pattern in all files within a folder"""
         folder_blacklist = self.config.get("folder_blacklist")
 
         if regex_pattern.strip() in [".", "*"]:
             return self.result("Forbidden pattern detected. Use a more specific search!", success=False)
 
-        compiled_pattern = regex.compile(regex_pattern)
+        # compile regex with optional case-insensitive flag
+        flags = 0 if case_sensitive else regex.IGNORECASE
+        compiled_pattern = regex.compile(regex_pattern, flags)
 
-        target_path = await self._get_sandbox_subpath(sandbox, dir_path)
+        target_path = await self._get_sandbox_subpath(sandbox, sub_path)
         if os.path.isdir(target_path):
             # recursive search
             matches = []
@@ -361,26 +367,50 @@ class Coder(core.module.Module):
                 # Filter out blacklisted and hidden directories using config
                 folders[:] = [d for d in folders if not d.startswith('.') and d not in folder_blacklist]
 
-                if len(matches) >= 100:
-                    # don't exceed 100 results
+                if len(matches) >= int(max_matches):
                     break
 
                 for file in files:
                     try:
                         filepath = os.path.join(recursive_path, file)
+                        
+                        # filter by extensions if specified
+                        if file_extensions:
+                            _, ext = os.path.splitext(file)
+                            if ext[1:] not in file_extensions:
+                                continue
+
                         with open(filepath, 'r', encoding="utf-8") as f:
-                            for line_num, line in enumerate(f, 1):
+                            all_lines = f.readlines()
+                            for line_num, line in enumerate(all_lines, 1):
                                 if compiled_pattern.search(line, timeout=self.regex_timeout):
-                                    matches.append({
+                                    # add context lines
+                                    context_lines = []
+                                    start = max(0, line_num - 1 - int(context))
+                                    end = min(len(all_lines), line_num + int(context))
+                                    for ctx_line_num in range(start, end):
+                                        if ctx_line_num + 1 != line_num:
+                                            context_lines.append(all_lines[ctx_line_num].rstrip())
+                                    
+                                    match_dict = {
                                         "file": os.path.relpath(filepath, target_path),
-                                        "line": line_num,
-                                        "snippet": line.rstrip()
-                                    })
+                                        "line_num": line_num,
+                                        "line": line.rstrip(),
+                                    }
+                                    if context:
+                                        match_dict.update({
+                                            "context_before": context_lines[:context],
+                                            "context_after": context_lines[-context:] if context > 0 else []
+                                        })
+
+                                    matches.append(match_dict)
+                                    if len(matches) >= int(max_matches):
+                                        break
                     except Exception as e:
                         pass
 
             if matches:
-                return self.result(matches) # 100 matches max
+                return self.result(matches)
             else:
                 return self.result("No matches found", success=False)
         else:
@@ -545,22 +575,47 @@ class Coder(core.module.Module):
 
         return result
 
-    async def grep_in_file(self, sandbox: str, file_path: str, regex_pattern: str):
+    async def file_grep(self, sandbox: str, file_path: str, regex_pattern: str, case_sensitive: bool = True, context: int = 0, max_matches: int = 100):
         target_path = await self._get_sandbox_subpath(sandbox, file_path)
-        compiled_pattern = regex.compile(regex_pattern)
+        
+        # compile regex with optional case-insensitive flag
+        flags = 0 if case_sensitive else regex.IGNORECASE
+        compiled_pattern = regex.compile(regex_pattern, flags)
 
         try:
             matches = []
             with open(target_path, 'r', encoding="utf-8") as f:
-                for line_num, line in enumerate(f, 1):
+                all_lines = f.readlines()
+                for line_num, line in enumerate(all_lines, 1):
                     if compiled_pattern.search(line, timeout=self.regex_timeout):
-                        matches.append({
-                            "line": line_num,
-                            "snippet": line.rstrip()
-                        })
+                        # add context lines
+                        context_lines = []
+                        start = max(0, line_num - 1 - int(context))
+                        end = min(len(all_lines), line_num + int(context))
+                        for ctx_line_num in range(start, end):
+                            if ctx_line_num + 1 != line_num:
+                                context_lines.append(all_lines[ctx_line_num].rstrip(),)
+
+                        match_dict = {
+                            "line_num": line_num,
+                            "line": line.rstrip()
+                        }
+
+                        if context:
+                            match_dict.update({
+                                "context_before": context_lines[:int(context)],
+                                "context_after": context_lines[-int(context):] if int(context) > 0 else []
+                            })
+
+                        matches.append(match_dict)
+
+                        if len(matches) >= int(max_matches):
+                            break
 
             if matches:
                 return self.result(matches)
+            else:
+                return self.result("No matches found", success=False)
         except Exception as e:
             # FKAWK SUAH
             return self.result(str(e), success=False)
