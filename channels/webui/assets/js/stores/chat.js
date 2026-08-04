@@ -91,7 +91,8 @@ CHAT_STORE = {
 
     async _fetchChats() {
         const offset = this.chatOffset;
-        const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}`);
+        const catParam = this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
+        const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`);
         if (!result) { return; }
 
         this.visibleChats.push(...result);

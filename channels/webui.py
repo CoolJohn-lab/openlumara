@@ -447,7 +447,12 @@ async def create_fastapi(channel):
         """Returns a list of all chats, with pagination"""
         offset = int(request.query_params.get("offset", 0))
         limit = int(request.query_params.get("limit", 50))
+        category = request.query_params.get("category", None)
+
         all_chats = channel.context.chat.get_all()
+        if category:
+            all_chats = [c for c in all_chats if c.get("category") == category]
+
         paginated = all_chats[offset:offset + limit]
         has_more = offset + limit < len(all_chats)
 
