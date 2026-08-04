@@ -61,7 +61,8 @@
                     x-data="{ 
                         active: false, 
                         renaming: false, 
-                        renameValue: ''
+                        renameValue: '',
+                        inViewport: false
                     }"
                     :id="`chat-${chat.id}`"
                     class="item"
@@ -84,48 +85,52 @@
                             }
                         })
                     "
+                    x-intersect:enter="inViewport = true"
+                    x-intersect:leave="inViewport = false"
                 >
-                    <template x-if="!renaming">
-                        <span class="title" x-text="chat.title || 'New chat'"></span>
-                    </template>
-                    <template x-if="renaming">
-                        <div class="rename-container">
-                            <input 
-                                x-ref="renameInput"
-                                type="text" 
-                                x-model="renameValue" 
-                                @keydown.enter="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''"
-                                @keydown.escape="renaming = false; renameValue = ''"
-                                @blur="setTimeout(() => { if (renaming) { renaming = false; renameValue = ''; } }, 150)"
-                                class="rename-input"
-                            >
-                            <button @click="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''" class="rename-action-btn save" title="Save">
-                                {% include 'svg/checkmark.svg' %}
-                            </button>
-                            <button @click="renaming = false; renameValue = ''" class="rename-action-btn cancel" title="Cancel">
-                                {% include 'svg/cross.svg' %}
-                            </button>
-                        </div>
-                    </template>
-                    
-                    <div class="meta">
-                        <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
-                        
-                        <div class="item-actions" @click.stop>
-                            <button class="action-btn" @click="renaming = true; renameValue = chat.title; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })" title="Rename">
-                                {% include 'svg/edit.svg' %}
-                            </button>
-                            <button class="action-btn delete" @click="$store.chat.deleteChat(chat.id)" title="Delete">
-                                {% include 'svg/trash.svg' %}
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <ul class="tags">
-                        <template x-for="tag in chat.tags.slice(0,3)" :key="tag">
-                            <li x-text="tag" class="tag"></li>
+                    <div x-show="inViewport" x-transition>
+                        <template x-if="!renaming">
+                            <span class="title" x-text="chat.title || 'New chat'"></span>
                         </template>
-                    </ul>
+                        <template x-if="renaming">
+                            <div class="rename-container">
+                                <input 
+                                    x-ref="renameInput"
+                                    type="text" 
+                                    x-model="renameValue" 
+                                    @keydown.enter="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''"
+                                    @keydown.escape="renaming = false; renameValue = ''"
+                                    @blur="setTimeout(() => { if (renaming) { renaming = false; renameValue = ''; } }, 150)"
+                                    class="rename-input"
+                                >
+                                <button @click="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''" class="rename-action-btn save" title="Save">
+                                    {% include 'svg/checkmark.svg' %}
+                                </button>
+                                <button @click="renaming = false; renameValue = ''" class="rename-action-btn cancel" title="Cancel">
+                                    {% include 'svg/cross.svg' %}
+                                </button>
+                            </div>
+                        </template>
+                        
+                        <div class="meta">
+                            <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
+                            
+                            <div class="item-actions" @click.stop>
+                                <button class="action-btn" @click="renaming = true; renameValue = chat.title; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })" title="Rename">
+                                    {% include 'svg/edit.svg' %}
+                                </button>
+                                <button class="action-btn delete" @click="$store.chat.deleteChat(chat.id)" title="Delete">
+                                    {% include 'svg/trash.svg' %}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <ul class="tags">
+                            <template x-for="tag in chat.tags.slice(0,3)" :key="tag">
+                                <li x-text="tag" class="tag"></li>
+                            </template>
+                        </ul>
+                    </div>
                 </div>
             </template>
         </template>

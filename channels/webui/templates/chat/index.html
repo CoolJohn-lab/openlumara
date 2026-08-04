@@ -38,33 +38,35 @@
 
     <!-- historical turns -->
     <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
-        <div class="fullwidth turn" :data-turn-index="turnIndex">
-            <!-- user turn (always one message) -->
-            <template x-if="turn.role === 'user'">
-                <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
-                    <div class="message user">
-                        {% include 'chat/turns/user.html' %}
-                        <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
-                            {% include 'chat/message_buttons.html' %}
+        <div x-data="{ inViewport: false }" x-intersect:enter="inViewport = true" x-intersect:leave="inViewport = false">
+            <div class="fullwidth turn" :data-turn-index="turnIndex" x-show="inViewport" x-transition>
+                <!-- user turn (always one message) -->
+                <template x-if="turn.role === 'user'">
+                    <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
+                        <div class="message user">
+                            {% include 'chat/turns/user.html' %}
+                            <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
+                                {% include 'chat/message_buttons.html' %}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </template>
+                </template>
 
-            <!-- assistant turn (multiple messages combined into one bubble) -->
-            <template x-if="turn.role === 'assistant'">
-                <div class="message-wrapper assistant">
-                    <div class="message assistant">
-                        <template x-for="(message, messageIndex) in turn.messages" :key="messageIndex">
-                            {% include 'chat/turns/assistant_history.html' %}
-                        </template>
+                <!-- assistant turn (multiple messages combined into one bubble) -->
+                <template x-if="turn.role === 'assistant'">
+                    <div class="message-wrapper assistant">
+                        <div class="message assistant">
+                            <template x-for="(message, messageIndex) in turn.messages" :key="messageIndex">
+                                {% include 'chat/turns/assistant_history.html' %}
+                            </template>
 
-                        <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
-                            {% include 'chat/message_buttons.html' %}
+                            <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
+                                {% include 'chat/message_buttons.html' %}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
     </template>
 
