@@ -3,7 +3,12 @@ CHAT_STORE = {
      * alpine.js store for chat state
      */
 
-    chats: [],
+    visibleChats: [],
+    chatOffset: 0,
+    chatLimit: 10,
+    chatsLoading: false,
+    hasMoreChats: true,
+
     categories: [],
     chat: {},
     selectedChat: null,
@@ -31,6 +36,9 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
         this.turnHistory = result.turn_history;
         this.currentTokenUsage = result.token_usage;
+
+        // ensure the chat exists in the visible sidebar list before scrolling
+        await this.ensureChatVisible(this.selectedChat);
     },
 
     /* ----------------------
@@ -55,6 +63,40 @@ CHAT_STORE = {
 
         // make sure it always shows the bottom of the chat
         await ui.forceScrollToBottom();
+    },
+
+    async reloadChats() {
+        this.chatOffset = 0;
+        this.visibleChats = [];
+        this.hasMoreChats = true;
+        await this._fetchChats();
+    },
+
+    async ensureChatVisible(chatId) {
+        const exists = this.visibleChats.some(c => c.id === chatId);
+        if (exists) { return; }
+        
+        // keep loading more chats until the target chat appears
+        while (this.hasMoreChats && !this.visibleChats.some(c => c.id === chatId)) {
+            await this.loadMoreChats();
+        }
+    },
+
+    async loadMoreChats() {
+        if (this.chatsLoading || !this.hasMoreChats) { return; }
+        this.chatsLoading = true;
+        await this._fetchChats();
+        this.chatsLoading = false;
+    },
+
+    async _fetchChats() {
+        const offset = this.chatOffset;
+        const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}`);
+        if (!result) { return; }
+
+        this.visibleChats.push(...result);
+        this.chatOffset += result.length;
+        this.hasMoreChats = result.length >= this.chatLimit;
     },
 
     async newChat() {
@@ -102,10 +144,6 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
 
         this.turnHistory = result.turn_history;
-    },
-
-    async reloadChats() {
-        this.chats = await simpleApiFetch('/api/chats');
     },
 
     async reloadCategories() {

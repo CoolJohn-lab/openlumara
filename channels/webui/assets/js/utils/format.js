@@ -7,6 +7,8 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+const _rtfCache = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
 function formatDate(dateString) {
     if (!dateString) return '';
 
@@ -19,12 +21,10 @@ function formatDate(dateString) {
     const now = new Date();
     const diffMs = date - now;
 
-    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-    if (Math.abs(diffMs) < 60000) return rtf.format(0, 'second');
-    if (Math.abs(diffMs) < 3600000) return rtf.format(Math.round(diffMs / 60000), 'minute');
-    if (Math.abs(diffMs) < 86400000) return rtf.format(Math.round(diffMs / 3600000), 'hour');
-    if (Math.abs(diffMs) < 604800000) return rtf.format(Math.round(diffMs / 86400000), 'day');
+    if (Math.abs(diffMs) < 60000) return _rtfCache.format(0, 'second');
+    if (Math.abs(diffMs) < 3600000) return _rtfCache.format(Math.round(diffMs / 60000), 'minute');
+    if (Math.abs(diffMs) < 86400000) return _rtfCache.format(Math.round(diffMs / 3600000), 'hour');
+    if (Math.abs(diffMs) < 604800000) return _rtfCache.format(Math.round(diffMs / 86400000), 'day');
 
     return date.toLocaleDateString();
 }

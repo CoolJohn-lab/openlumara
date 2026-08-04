@@ -444,9 +444,14 @@ async def create_fastapi(channel):
 
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
-        """Returns a list of all chats"""
+        """Returns a list of all chats, with pagination"""
+        offset = int(request.query_params.get("offset", 0))
+        limit = int(request.query_params.get("limit", 50))
+        all_chats = channel.context.chat.get_all()
+        paginated = all_chats[offset:offset + limit]
+        has_more = offset + limit < len(all_chats)
 
-        return api_result(channel.context.chat.get_all(), success=True)
+        return api_result(paginated, success=True)
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():
