@@ -759,9 +759,24 @@ async def create_fastapi(channel):
     @app.get('/manifest.json')
     async def manifest():
         """Serve the PWA manifest."""
-        with open(core.get_path("channels/webui/manifest.json")) as f:
+        with open(os.path.join(channel.path, "manifest.json")) as f:
             manifest_data = json.loads(f.read())
         return manifest_data
+
+    @app.get('/icon-192.png')
+    async def icon_192():
+        """Serve the 192x192 icon for PWA."""
+        return fastapi.responses.FileResponse(os.path.join(channel.path, "icon-192.png"))
+
+    @app.get('/icon-512.png')
+    async def icon_512():
+        """Serve the 512x512 icon for PWA."""
+        return fastapi.responses.FileResponse(os.path.join(channel.path, "icon-512.png"))
+
+    @app.get('/favicon.ico')
+    async def favicon():
+        """Serve the favicon for the web interface."""
+        return fastapi.responses.FileResponse(os.path.join(channel.path, "favicon.ico"))
 
     # ------------------
     # WebSocket endpoint
