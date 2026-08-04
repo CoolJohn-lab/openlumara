@@ -152,6 +152,7 @@ CHAT_STORE = {
 
     async selectCategory(category) {
         this.selectedCategory = category;
+        await this.reloadChats();
     },
 
     async clearInput() {
