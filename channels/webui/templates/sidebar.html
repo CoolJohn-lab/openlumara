@@ -88,7 +88,7 @@
                     x-intersect:enter="inViewport = true"
                     x-intersect:leave="inViewport = false"
                 >
-                    <div x-show="inViewport" x-transition>
+                    <template x-if="inViewport">
                         <template x-if="!renaming">
                             <span class="title" x-text="chat.title || 'New chat'"></span>
                         </template>
@@ -130,7 +130,7 @@
                                 <li x-text="tag" class="tag"></li>
                             </template>
                         </ul>
-                    </div>
+                    </template>
                 </div>
             </template>
         </template>
