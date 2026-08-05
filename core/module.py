@@ -159,7 +159,7 @@ class Module:
 # Registry format: {"command_name": [(class_type, method), ...]}
 _command_registry = {}
 
-def command(name, help=None, send_to_ai=False):
+def command(name, help=None, send_to_ai=True):
     """
     Decorator to register a method as a command handler.
     Accepts a string description or a dictionary for subcommand help.
