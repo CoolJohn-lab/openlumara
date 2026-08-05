@@ -111,11 +111,14 @@ def validate_path_string(path: str) -> str:
 
     return decoded
 
-def sandbox_path(base_path: str, requested_path: str) -> str:
+def sandbox_path(base_path: str, requested_path: str = None) -> str:
     """
     protects against path traversal attacks and the like
     """
     path = requested_path
+    if not requested_path:
+        # the base path is basically always the sandbox path, so um, yeah, no need to filter that
+        return base_path
 
     # we dont use os.path.normpath here because it resolves '..' and allows path traversal
     # so we do the cross-platform stuff manually instead....

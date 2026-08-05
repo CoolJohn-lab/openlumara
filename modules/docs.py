@@ -16,7 +16,7 @@ class Docs(core.module.Module):
 
     async def on_ready(self):
         docs_path = self.config.get("documentation_path") or core.get_path("docs")
-        self.data = core.storage.StorageDict(".", "markdown", path=docs_path)
+        self.data = core.storage.StorageDict(None, "markdown", path=docs_path)
 
         # force load so it works in temporary mode
         self.data.load()

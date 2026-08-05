@@ -16,7 +16,7 @@ class StorageList(list):
             path = core.get_data_path()
 
         self.path = core.sandbox_path(path, name)
-        self.name = os.path.basename(self.path)
+        self.name = name
         self.binary = False
 
         # create path if it doesnt exist
@@ -163,7 +163,7 @@ class StorageDict(dict):
 
         self.path = core.sandbox_path(path, name)
 
-        self.name = os.path.basename(self.path)
+        self.name = name
         self.binary = False
 
         # create path if it doesnt exist
