@@ -4,7 +4,6 @@ THEME_STORE = {
     themeCache: {},  // Cache for loaded theme data
     themeList: [],   // List of available theme families
 
-    // Initialize - load everything asynchronously, page themed immediately
     init() {
         // Load theme list (just names and modes) - async, doesn't block
         fetch('/api/themes')
@@ -40,7 +39,6 @@ THEME_STORE = {
         }
     },
 
-    // Apply theme - synchronous after init
     apply(family, mode) {
         const themeData = this.themeCache[family];
         if (!themeData) {

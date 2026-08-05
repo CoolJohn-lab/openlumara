@@ -1,11 +1,29 @@
-function formatLabel(key) {
-    if (typeof key !== 'string') return key;
-    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 function isToggleList(data) {
     if (typeof data !== 'object' || data === null) return false;
     return Array.isArray(data.enabled) && Array.isArray(data.disabled);
+}
+
+function detectFieldType(value, key = '') {
+    // special keys that should be displayed in a special way
+    switch (key) {
+        case "model.name":                  return "model_select"
+        case "api.url":                     return "api_url"
+        case "api.key":                     return "api_key"
+        case "model.reasoning_effort":      return "reasoning_effort_slider"
+    }
+
+    // standard types
+    if (value === null || value === undefined) return 'text';
+    else if (typeof value === 'boolean') return 'boolean';
+    else if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
+    else if (Array.isArray(value)) return 'array';
+    else if (typeof value === 'string') {
+        if (value.match(/^https?:\/\//)) return 'url';
+        else if (value.includes('\n')) return 'textarea';
+        else return 'text';
+    } else {
+        return 'text';
+    }
 }
 
 function buildSettingsStructure(originalData, moduleInfo = {}) {
@@ -107,7 +125,7 @@ function buildFieldSettings(obj, schema, prefix = '') {
             const schemaValue = fieldSchema.default !== undefined ? fieldSchema.default : value;
             settings[key] = {
                 title: formatLabel(key),
-                type: fieldSchema.type === 'long_text' ? 'textarea' : (fieldSchema.type || detectType(schemaValue, fullKey)),
+                type: fieldSchema.type === 'long_text' ? 'textarea' : (fieldSchema.type || detectFieldType(schemaValue, fullKey)),
                 description: fieldSchema.description || null,
                 unsafe: fieldSchema.unsafe || false,
                 value: value,
@@ -151,7 +169,7 @@ function buildFieldSettings(obj, schema, prefix = '') {
             // Primitive value without schema definition
             settings[key] = {
                 title: formatLabel(key),
-                type: detectType(value, fullKey),
+                type: detectFieldType(value, fullKey),
                 description: fieldSchema.description || null,
                 unsafe: fieldSchema.unsafe || false,
                 depends: fieldSchema.depends || null,
@@ -166,58 +184,3 @@ function buildFieldSettings(obj, schema, prefix = '') {
 
     return settings;
 }
-
-function flattenForBackend(categories) {
-    const result = {};
-
-    for (const [catKey, category] of Object.entries(categories)) {
-        if (!category.settings && !category.enabled && !category.disabled) continue;
-        
-        result[catKey] = {};
-        
-        // Handle modules/channels
-        if (category.isModuleCategory) {
-            if (category.enabled !== undefined) result[catKey].enabled = category.enabled;
-            if (category.disabled !== undefined) result[catKey].disabled = category.disabled;
-            
-            if (category.settings) {
-                result[catKey].settings = {};
-                for (const [name, module] of Object.entries(category.settings)) {
-                    if (module.value) {
-                        result[catKey].settings[name] = flattenModuleSettings(module.value);
-                    }
-                }
-            }
-        } else {
-            // Regular category - flatten all settings
-            result[catKey] = flattenCategorySettings(category.settings);
-        }
-    }
-
-    return result;
-}
-
-function flattenModuleSettings(settings) {
-    const result = {};
-    for (const [key, setting] of Object.entries(settings)) {
-        if (setting.type === 'object' && setting.settings) {
-            result[key] = flattenModuleSettings(setting.settings);
-        } else {
-            result[key] = setting.value;
-        }
-    }
-    return result;
-}
-
-function flattenCategorySettings(settings) {
-    const result = {};
-    for (const [key, setting] of Object.entries(settings)) {
-        if (setting.type === 'object' && setting.settings) {
-            result[key] = flattenCategorySettings(setting.settings);
-        } else {
-            result[key] = setting.value;
-        }
-    }
-    return result;
-}
-

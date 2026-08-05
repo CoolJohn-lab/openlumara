@@ -28,3 +28,9 @@ function formatDate(dateString) {
 
     return date.toLocaleDateString();
 }
+
+function formatLabel(key) {
+    if (typeof key !== 'string') return key;
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
