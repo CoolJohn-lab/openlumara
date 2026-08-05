@@ -134,7 +134,7 @@
             <div class="item">
                 <div class="toggle-row">
                     <label>Expand Reasoning by Default</label>
-                    <button class="toggle" type="button" :class="{ active: $store.settings.expandReasoning }" @click="$store.settings.expandReasoning = !$store.settings.expandReasoning">
+                    <button class="toggle" type="button" :class="{ active: $store.ui.expandReasoning }" @click="$store.ui.expandReasoning = !$store.ui.expandReasoning">
                     </button>
                 </div>
                 <span class="description">Whether to expand the thinking block by default. If you prefer not to see your AI's thoughts all the time, you can disable this. You can then still always expand the thought block!</span>

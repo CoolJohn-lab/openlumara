@@ -14,7 +14,6 @@ SETTINGS_STORE = {
     
     // --- Feature Flags ---
     showUnsafe: false,
-    expandReasoning: JSON.parse(localStorage.getItem('expandReasoning') || 'false'),
     
     // --- Model Cache ---
     cachedModels: null,
@@ -158,7 +157,8 @@ SETTINGS_STORE = {
             this.systemPrompt = simpleApiFetch("/api/chat/prompt");
 
             // handle localstorage settings
-            localStorage.setItem('expandReasoning', this.expandReasoning);
+            const ui = Alpine.store('ui');
+            localStorage.setItem('expandReasoning', ui.expandReasoning);
 
             this.changedModuleSettings.clear();
         } catch (err) {

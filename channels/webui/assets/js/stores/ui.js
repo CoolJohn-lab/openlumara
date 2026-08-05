@@ -28,7 +28,7 @@ UI_STORE = {
         this.showCategories = !this.isMobile;
         this.showChatList = true;
 
-        this.expandReasoning = localStorage.getItem("expandReasoning") === "true";
+        this.expandReasoning = localStorage.getItem("expandReasoning") !== 'false';
     },
 
     async toggleSidebar() {
