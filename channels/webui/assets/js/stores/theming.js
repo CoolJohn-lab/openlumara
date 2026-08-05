@@ -139,7 +139,7 @@ THEME_STORE = {
         localStorage.setItem('fontSize', size);
 
         const root = document.documentElement;
-        root.style.setProperty('--font-size-base', `${this.fontSize}px`);
+        root.style.setProperty('--font-size-base', `${size}px`);
     },
 
     // Load Google Font

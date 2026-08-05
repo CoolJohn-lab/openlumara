@@ -8,7 +8,7 @@
                             <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                         {% include 'svg/wrench.svg' %}
-                        <span class="name" x-text="tool.function.name"></span>
+                        <span class="name" x-text="tool.function?.name || 'unknown'"></span>
                         <template x-if="tool.response">
                             <span class="status completed" x-init="collapsed = true">done</span>
                         </template>
@@ -21,7 +21,7 @@
                         <div class="section">
                             <div class="args">
                                 <div class="title">Arguments</div>
-                                <template x-for="(value, key) in partialJsonParse(tool.function.arguments)">
+                                <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}')">
                                     <div class="arg-row">
                                         <span class="arg-name" x-text="key"></span>
                                         <span class="arg-value" x-text="value"></span>

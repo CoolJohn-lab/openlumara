@@ -28,7 +28,7 @@
                         <!-- Mobile: show category list when no category selected -->
                         <template x-if="mobile && !activeCategory">
                             <div class="mobile-category-list">
-                                <template x-for="[cat, data] in $store.settings.sorted$store.settings.categories" :key="cat">
+                                <template x-for="[cat, data] in $store.settings.sortedCategories" :key="cat">
                                     <button @click="activeCategory = cat" class="mobile-category-btn">
                                         <span x-text="data.title"></span>
                                     </button>

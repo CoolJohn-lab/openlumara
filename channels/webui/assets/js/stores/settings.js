@@ -68,7 +68,7 @@ SETTINGS_STORE = {
 
             this.showUnsafe = this.settings.channels.settings.webui.show_unsafe_settings;
 
-            this.systemPrompt = simpleApiFetch("/api/chat/prompt");
+            this.systemPrompt = await simpleApiFetch("/api/chat/prompt");
 
             await this.checkApiConnection();
         } catch (err) {
@@ -154,7 +154,7 @@ SETTINGS_STORE = {
             this.originalCategories = JSON.parse(JSON.stringify(this.categories));
 
             // re-fetch system prompt
-            this.systemPrompt = simpleApiFetch("/api/chat/prompt");
+            this.systemPrompt = await simpleApiFetch("/api/chat/prompt");
 
             // handle localstorage settings
             const ui = Alpine.store('ui');

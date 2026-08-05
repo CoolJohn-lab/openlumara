@@ -9,7 +9,7 @@
         <h4>Color Theme</h4>
         <div class="theme-controls-row" x-init="$nextTick(() => { 
             const store = Alpine.store('theme'); 
-            if (store.family) { 
+            if (store.family && $refs.themeSelect) { 
                 $refs.themeSelect.value = store.family; 
             }
         })">

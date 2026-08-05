@@ -225,7 +225,8 @@ CHAT_STORE = {
      * ----------------------- */
     async copyMessage(turnIndex) {
       const turn = this.turnHistory[turnIndex];
-      const msg = turn.messages[turn.messages.length-1]; // last message in the turn
+      const msg = turn?.messages?.[turn.messages?.length - 1]; // last message in the turn
+      if (!msg) return;
       navigator.clipboard.writeText(msg.content)
         .then(() => {
             return true;
@@ -237,6 +238,7 @@ CHAT_STORE = {
 
     async deleteMessage(turnIndex) {
         const turn = this.turnHistory[turnIndex];
+        if (!turn) return;
         await simpleSocketSend({
             "type": "message_delete",
             "index": turn.first_message_index
@@ -245,6 +247,7 @@ CHAT_STORE = {
 
     async regenerateMessage(turnIndex) {
         const turn = this.turnHistory[turnIndex];
+        if (!turn) return;
 
         Alpine.store('stream').userMsg = null;
         Alpine.nextTick(async () => {
@@ -259,7 +262,8 @@ CHAT_STORE = {
 
     async startEdit(turnIndex) {
         const turn = this.turnHistory[turnIndex];
-        const msg = turn.messages[turn.messages.length-1]; // last message in the turn
+        const msg = turn?.messages?.[turn.messages?.length - 1]; // last message in the turn
+        if (!msg) { return; }
         
         this.editingMessageIndex = msg.index;
         this.editContent = msg.content;

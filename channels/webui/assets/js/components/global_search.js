@@ -65,7 +65,7 @@ function globalSearch() {
         async enterResult() {
             if (this.results.length === 0) return;
             const idx = this.activeIndex >= 0 ? this.activeIndex : 0;
-            await this.selectResult(this.results[idx].chat.id);
+            await this.selectResult(this.results[idx]?.chat?.id);
         }
     }
 }

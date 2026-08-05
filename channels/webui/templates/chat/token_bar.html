@@ -1,6 +1,8 @@
 <div id="token-usage-bar" x-data="{
     get percentage() {
-        return ($store.chat.currentTokenUsage / $store.system.data.max_context) * 100;
+        const max = $store.system.data?.max_context;
+        if (!max) return 0;
+        return ($store.chat.currentTokenUsage / max) * 100;
     }
 }">
     <!-- only show the text once max_context has been loaded from the API -->

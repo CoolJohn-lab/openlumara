@@ -54,7 +54,7 @@
                     x-if="
                         chat.category === $store.chat.selectedCategory
                         &&
-                        chat.title.toLowerCase().includes(query.toLowerCase())
+                        (chat.title || '').toLowerCase().includes(query.toLowerCase())
                     "
                 >
                     <!-- give selected chats a nice border via the CSS class -->
@@ -124,7 +124,7 @@
                             </div>
                             
                             <ul class="tags">
-                                <template x-for="tag in chat.tags.slice(0,3)" :key="tag">
+                                <template x-for="tag in (chat.tags ?? []).slice(0,3)" :key="tag">
                                     <li x-text="tag" class="tag"></li>
                                 </template>
                             </ul>

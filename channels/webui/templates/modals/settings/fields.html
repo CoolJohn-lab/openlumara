@@ -56,7 +56,7 @@
                         <option :value="optionKey" x-text="optionKey" :selected="setting.value === optionKey"></option>
                     </template>
                 </select>
-                <span class="description" x-show="setting.options && setting.options[setting.value]" x-html="renderMarkdown(setting.options[setting.value])"></span>
+                <span class="description" x-show="setting.options?.[setting.value]" x-html="renderMarkdown(setting.options?.[setting.value])"></span>
             </div>
         </template>
 
