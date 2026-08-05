@@ -75,15 +75,15 @@ THEME_STORE = {
         }
 
         // apply font size
-        const fontSize = localStorage.getItem('fontSize');
+        const fontSize = localStorage.getItem('fontSize') || 16;
         root.style.setProperty('--font-size-base', `${fontSize}px`);
 
         // apply chat width
-        const chatWidth = localStorage.getItem('chatContentWidth');
+        const chatWidth = localStorage.getItem('chatContentWidth') || 100;
         root.style.setProperty('--chat-content-width', `${chatWidth}%`);
         
         // apply message bubble width
-        const messageWidth = localStorage.getItem('messageMaxWidth');
+        const messageWidth = localStorage.getItem('messageMaxWidth') || 70;
         root.style.setProperty('--message-max-width', `${messageWidth}%`);
 
         // Apply theme vars on top of base
