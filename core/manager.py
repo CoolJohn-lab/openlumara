@@ -428,7 +428,7 @@ class Manager:
 
             if autorestart:
                 if self.channel:
-                    await self.channel.push(f"{channel.name.capitalize()} channel {'enabled' if new_state else 'disabled'}. Restarting to apply change..")
+                    await self.channel.push(f"{channel_name.capitalize()} channel {'enabled' if new_state else 'disabled'}. Restarting to apply change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 
