@@ -37,9 +37,6 @@ CHAT_STORE = {
         this.turnHistory = result.turn_history;
         this.currentTokenUsage = result.token_usage;
 
-        // ensure there are always more chats loaded than what fits in the current viewport
-        await this.ensureMoreChats();
-
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
     },
@@ -73,6 +70,9 @@ CHAT_STORE = {
         this.visibleChats = [];
         this.hasMoreChats = true;
         await this._fetchChats();
+
+        // ensure there are always more chats loaded than what fits in the current viewport
+        await this.ensureMoreChats();
     },
 
     async ensureChatVisible(chatId) {
