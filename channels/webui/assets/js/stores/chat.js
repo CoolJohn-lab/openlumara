@@ -109,9 +109,9 @@ CHAT_STORE = {
         const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`);
         if (!result) { return; }
 
-        this.visibleChats.push(...result);
-        this.chatOffset += result.length;
-        this.hasMoreChats = result.length >= this.chatLimit;
+        this.visibleChats.push(...result.messages);
+        this.chatOffset += result.messages.length;
+        this.hasMoreChats = result.has_more;
     },
 
     async newChat() {

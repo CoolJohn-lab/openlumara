@@ -467,7 +467,7 @@ async def create_fastapi(channel):
         paginated = all_chats[offset:offset + limit]
         has_more = offset + limit < len(all_chats)
 
-        return api_result(paginated, success=True)
+        return api_result({"messages": paginated, "has_more": has_more}, success=True)
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():
