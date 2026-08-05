@@ -137,6 +137,9 @@ class Coder(core.module.Module):
         if self.config.get("use_coding_prompt") and self.config.get("coding_prompt"):
             final_output.append(f"## Coding Guidelines\nYOU MUST ALWAYS follow these guidelines while using the coder:\n{self.config.get('coding_prompt')}")
 
+        if self.config.get("read-only"):
+            final_output.append("## IMPORTANT: Read-Only Mode\nYour coder module is in read-only mode and you cannot write to files. Provide output code to the user directly in your messages.")
+
         if final_output:
             return "\n\n".join(final_output)
         return None
@@ -197,11 +200,13 @@ class Coder(core.module.Module):
         errors = []
 
         lang = tslp.detect_language_from_path(file_path)
-        if not lang or lang in ("vimdoc"):
+        if not lang or lang in ("vimdoc", "html", "htm"):
             # that means treesitter doesn't support the language,
             # or it's a plaintext file (labeled by treesitter as 'vimdoc'),
             # so to avoid blocking code editing for unsupported languages,
             # just pretend the syntax error check passed
+
+            # also, html syntax is skipped because the checker is too aggressive and forbids & characters, causing tons of false positive rejections
             return []
 
         result = tslp.process(code, tslp.ProcessConfig(language=lang, diagnostics=True, structure=False))
