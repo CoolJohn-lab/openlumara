@@ -175,7 +175,7 @@ class WritingStyle(core.module.Module):
         "custom_desire": {
             "default": None,
             "description": "Define a custom desire for the AI.",
-            "depends": {"mood": "desire"}
+            "depends": {"desire": "custom"}
         }
     }
 
