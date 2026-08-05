@@ -305,7 +305,26 @@ class Context:
             return 0
 
         try:
-            data_str = json.dumps(data)
+            if isinstance(data, list):
+                # this is likely an array of messages
+
+                # count only the text tokens, since API's exempt multimodal content from token limits,
+                # and we auto remove all previous multimodal content from context when passing to the API,
+                # sending only the current message's multimodal content (such as an image)
+
+                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content, 
+                # then i asked my local AI for a more compact and performance friendly way to do it.
+                # now that's a good way to use AI coding, imho :)
+                # thanks Qwen3.6-35B!
+                cleaned_messages = [
+                    {**msg, "content": [item for item in (msg.get("content") or []) if item.get("type") == "text"]}
+                    if isinstance(msg.get("content"), list)
+                    else msg
+                    for msg in data
+                ]
+                data_str = json.dumps(cleaned_messages)
+            else:
+                data_str = json.dumps(data)
         except Exception as e:
             raise Exception(f"Error while counting tokens: {core.detail_error(e)}")
 

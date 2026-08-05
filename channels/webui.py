@@ -645,26 +645,6 @@ async def create_fastapi(channel):
         await channel.manager.restart()
 
     # ----------------------------
-    # File uploading
-    # ----------------------------
-    # --- POST
-    @app.post("/api/upload")
-    async def upload_file(request: fastapi.Request):
-        """Uploads files for multimodal messages. Supports images, audio, video, and documents.
-        
-        Returns content_parts in OpenAI API format that can be included in the user message.
-        """
-        form = await request.form()
-        files = form.getlist("files")
-        text = form.get("text")
-        
-        if not files:
-            return api_result({"error": "No files provided"}, success=False)
-        
-        message = self.process_multimodal({"role": "user", "content": text}, files)
-        return api_result(message, success=True)
-
-    # ----------------------------
     # Theme API endpoints
     # ----------------------------
     @app.get("/api/themes")
