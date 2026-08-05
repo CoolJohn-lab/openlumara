@@ -95,6 +95,8 @@ CHAT_STORE = {
          * so that x-intersect always works (because it needs to be out of view first)
          */
         const intersect_el = document.getElementById("chat-scroll-loader");
+        if (!intersect_el) { return; }
+
         const rect = intersect_el.getBoundingClientRect();
 
         if (rect.top < window.innerHeight && rect.bottom > 0) {
