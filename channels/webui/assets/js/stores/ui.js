@@ -14,7 +14,7 @@ UI_STORE = {
     showCategories: true,
     showChatList: true,
 
-    expandReasoning: false,
+    expandReasoning: true,
 
     async init() {
         // check if this is a phone
@@ -28,7 +28,7 @@ UI_STORE = {
         this.showCategories = !this.isMobile;
         this.showChatList = true;
 
-        this.expandReasoning = localStorage.getItem("expandReasoning");
+        this.expandReasoning = localStorage.getItem("expandReasoning") || true;
     },
 
     async toggleSidebar() {
