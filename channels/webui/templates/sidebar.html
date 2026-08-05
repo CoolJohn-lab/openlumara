@@ -134,14 +134,9 @@
             </template>
         </div>
 
-        <div x-intersect="if ($store.chat.hasMoreChats && !$store.chat.chatsLoading) { $store.chat.loadMoreChats() }"
-             class="sentinel" style="height: 48px;"></div>
-
-        <!-- optional: show a loading spinner when fetching -->
-        <div x-show="$store.chat.chatsLoading" class="loading-spinner" style="text-align: center; padding: 10px; color: #888;">
-            loading more chats...
-        </div>
-
+        <template x-if="$store.chat.hasMoreChats">
+            <div x-intersect="$store.chat.loadMoreChats()"></div>
+        </template>
     </div>
 
     <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
