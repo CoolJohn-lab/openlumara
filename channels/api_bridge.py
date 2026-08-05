@@ -4,8 +4,9 @@ import time
 import uuid
 import uvicorn
 import json
+import time
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
@@ -82,14 +83,6 @@ class ApiBridge(core.channel.Channel):
         presence_penalty: Optional[float] = 0.0
         frequency_penalty: Optional[float] = 0.0
 
-    class Model(BaseModel):
-        id: str
-        object: str = "model"
-
-    class ModelsResponse(BaseModel):
-        object: str = "list"
-        data: List[Model]
-
     # -------------------------
     #   EVENT HANDLERS
     # -------------------------
@@ -137,13 +130,29 @@ class ApiBridge(core.channel.Channel):
                     )
             return await call_next(request)
 
+        @app.get("/v1")
+        async def index():
+            return RedirectResponse("/v1/health", status_code=307)
+        @app.post("/v1")
+        async def completions_redirect():
+            return RedirectResponse("/v1/chat/completions", status_code=307)
+
+        @app.get("/v1/health")
+        async def health():
+            return {"status": "OK"}
+
         @app.get("/v1/models")
         async def list_models():
-            """Returns a list of available models."""
-            models = [self.Model(id="openlumara")]
-            #for model_id in await self.manager.API.list_models():
-            #    models.append(self.Model(id=model_id))
-            return self.ModelsResponse(data=models)
+            """Returns a fake model list that basically just contains openlumara as a model. Use the `/model` command to switch models inside openlumara."""
+            return {
+                "object": "list",
+                "data": [{
+                    "id": "openlumara",
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "openlumara"
+                }]
+            }
 
         @app.post("/v1/chat/completions")
         async def chat_completions(request: Request):
@@ -154,7 +163,6 @@ class ApiBridge(core.channel.Channel):
                 raise HTTPException(status_code=400, detail="No messages provided")
             
             last_msg = chat_req.messages[-1]
-            # ol_message = {"role": last_msg.role, "content": last_msg.content}
 
             if chat_req.stream:
                 return StreamingResponse(
@@ -162,7 +170,7 @@ class ApiBridge(core.channel.Channel):
                     media_type="text/event-stream"
                 )
             else:
-                return await self._completion_handler(ol_message, chat_req.model)
+                return await self._completion_handler(last_msg.content, chat_req.model)
 
         # Start the server with SO_REUSEADDR to handle "address already in use" errors
         # Create a socket with SO_REUSEADDR
@@ -172,7 +180,7 @@ class ApiBridge(core.channel.Channel):
             sock.bind((self.host, self.port))
             sock.listen(5)
             
-            config = uvicorn.Config(app, host=self.host, port=self.port, log_level="critical")
+            config = uvicorn.Config(app, host=self.host, port=self.port, log_level="error")
             self.server = uvicorn.Server(config)
 
             self.log("api bridge", f"The API bridge is up and running on {self.host}:{self.port}")
@@ -185,16 +193,22 @@ class ApiBridge(core.channel.Channel):
 
 
     async def on_shutdown(self):
-        if hasattr(self, "server") and self.server:
-            self.server.should_exit = True
-            while self.server_running:
-                await asyncio.sleep(0.1)
-            self.log("api bridge", "API bridge server shut down successfully.")
+        # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
+        self.server.should_exit = True
 
-    async def _completion_handler(self, ol_message: dict, model: str) -> JSONResponse:
+        # wait for uvicorn to actually finish shutting down
+        try:
+            await asyncio.wait_for(self.server.shutdown(), timeout=5.0)
+        except (AttributeError, asyncio.TimeoutError):
+            # fallback: just give it a moment to release the socket
+            await asyncio.sleep(0.5)
+
+        self.log("api bridge", "API bridge server shut down successfully.")
+
+    async def _completion_handler(self, message: str, model: str) -> JSONResponse:
         try:
             # send the request to the framework and format it
-            response_dict = await self.send(ol_message.get("content"), commands_authorized=True)
+            response_dict = await self.send(message, commands_authorized=True)
             response_dict = self.format_message(response_dict)
             content = response_dict.get("content", "")
 
@@ -225,7 +239,7 @@ class ApiBridge(core.channel.Channel):
                 content={"error": {"message": str(e), "type": "server_error", "param": None, "code": "internal_error"}}
             )
 
-    async def _stream_handler(self, ol_message: str, model: str):
+    async def _stream_handler(self, message: str, model: str):
         try:
             chat_id = f"chatcmpl-{uuid.uuid4()}"
             created_time = int(time.time())
@@ -233,16 +247,17 @@ class ApiBridge(core.channel.Channel):
             # Initial empty chunk to satisfy some clients
             yield f"data: {self._openai_chunk(chat_id, created_time, model, '')}\n\n"
 
-            async for token in self.format_stream_for_text(
-                self.send_stream(ol_message, commands_authorized=True)
-            ):
-                token_type = token.get("type")
-                token_content = token.get("content")
+            try:
+                async for token in self.format_stream_for_text(
+                    self.send_stream(message, commands_authorized=True)
+                ):
+                    token_type = token.get("type")
+                    token_content = token.get("content")
 
-                if token_type == "content":
-                    yield f"data: {self._openai_chunk(chat_id, created_time, model, token_content)}\n\n"
-
-            yield "data: [DONE]\n\n"
+                    if token_type == "content":
+                        yield f"data: {self._openai_chunk(chat_id, created_time, model, token_content)}\n\n"
+            finally:
+                yield "data: [DONE]\n\n"
 
         except Exception as e:
             self.log(self.name, f"Error in stream: {str(e)}")
