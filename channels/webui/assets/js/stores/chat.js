@@ -37,6 +37,9 @@ CHAT_STORE = {
         this.turnHistory = result.turn_history;
         this.currentTokenUsage = result.token_usage;
 
+        // ensure there are always more chats loaded than what fits in the current viewport
+        await this.ensureMoreChats();
+
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
     },
@@ -87,6 +90,20 @@ CHAT_STORE = {
         this.chatsLoading = true;
         await this._fetchChats();
         this.chatsLoading = false;
+    },
+
+    async ensureMoreChats(el) {
+        /* 
+         * makes sure there are always more chats loaded
+         * than what the viewport can show,
+         * so that x-intersect always works (because it needs to be out of view first)
+         */
+        const intersect_el = document.getElementById("chat-scroll-loader");
+        const rect = intersect_el.getBoundingClientRect();
+
+        if (rect.top < window.innerHeight && rect.bottom > 0) {
+            await this.loadMoreChats();
+        }
     },
 
     async _fetchChats() {
