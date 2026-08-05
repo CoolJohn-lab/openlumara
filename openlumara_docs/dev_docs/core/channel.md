@@ -94,11 +94,14 @@ Channels implement a "push queue" that allows the system to send messages to the
 ### Internal Methods
 | Method | Description |
 | :--- | :--- |
-| `_set_as_active_channel()` | Updates `manager.channel` to this channel and propagates the channel reference to all modules. |
-| `_get_disconnection_message()` | Builds a user-friendly disconnection message with error details and configuration hints. |
+| `_set_as_active_channel()` | Updates `manager.channel` to this channel and propagates the channel reference to all modules. Also saves last channel to persistent storage. |
 | `_extract_content(message_dict)` | Extracts text content from a message dict, handling both string and multimodal (list) content. |
 | `_shutdown()` | Internal shutdown: sets `_shutting_down` flag and cancels the push queue task. |
 | `__init_subclass__()` | Merges settings from parent channel classes into the subclass settings dict. |
+| `_send_preprocess(message, files, commands_authorized)` | Internal helper for send/send_stream. Handles command detection, module hooks, multimodal processing, context building. |
+| `_send_postprocess(assistant_message)` | Adds assistant message to context and runs on_assistant_message hooks. |
+| `_build_final_assistant_message(final_content, final_reasoning)` | Builds final assistant message dict. Avoids shared mutable default argument issue. |
+| `throw_stream_error(error)` | Helper to consistently throw errors during streaming. |
 
 ## Implementation Workflow (Sending a Message)
 

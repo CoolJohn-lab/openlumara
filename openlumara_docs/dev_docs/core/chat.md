@@ -1,134 +1,261 @@
 # Core: The Chat System (`core.Chat`)
 
-The `Chat` class is responsible for managing the lifecycle and persistence of individual chat sessions. It acts as the interface between the high-level `Context` and the low-level persistent storage.
+The `Chat` class manages chat history, metadata, and retrieval within OpenLumara. Each channel has its own set of chats, stored in channel-specific directories.
 
-## Responsibilities
+## Overview
 
-### 1. Session Management
-`Chat` manages a collection of chat sessions, allowing the user to:
-- **Create New Chats**: Start fresh conversations with unique IDs and metadata.
-- **Switch Chats**: Load existing chat histories by their ID.
-- **Clear Chats**: Wipe the message history of the current session.
-- **Delete Chats**: Permanently remove a chat session from storage.
-- **Auto-Resume**: Automatically reload the last used chat session upon application startup (via a save file tracking the current index).
+The `Chat` class provides a complete chat management system including:
+- Chat creation and auto-resume
+- Message history storage and retrieval (stored separately per chat)
+- Chat search across all conversations
+- Chat metadata management (title, category, tags)
+- Chat export functionality
+- Automatic migration from legacy formats
 
-### 2. Message Persistence
-Every message sent or received is stored within a chat session. `Chat` ensures that:
-- **History is Maintained**: The sequence of user and assistant messages is preserved.
-- **Metadata is Stored**: Titles, categories, tags, and custom metadata (like character info) are kept alongside the messages.
-- **Efficient Storage**: Data is saved using efficient formats (like JSON) to ensure fast loading and low overhead.
+## Storage Structure
 
-### 3. Token Tracking
-`Chat` tracks the token usage of the current conversation:
-- **API-Provided Usage**: Whenever the API returns usage data, `Chat` updates its internal counter and sets `using_api_token_data = True`.
-- **Local Estimation**: If the API does not provide usage data, `Chat` uses a local tokenizer (`tiktoken`) to estimate the number of tokens used in the current context. Falls back to character-based estimation (~4 chars/token) if tiktoken fails.
+### Directory Layout
+```
+data/
+└── chats/
+    └── <channel_name>/
+        ├── index.mp          # MessagePack index file (chat metadata)
+        ├── current           # File containing index of active chat
+        └── history/
+            ├── <chat_id>.json   # Chat history file
+            ├── <chat_id2>.json
+            └── ...
+```
 
-### 4. Data Integrity and Cleanup
-`Chat` performs maintenance on the chat collection:
-- **Automatic Title Generation**: When a new message is sent in a blank chat, it automatically generates a short title based on the message content (first 100 chars).
-- **Cleanup on Init**: On construction, removes "empty" chats (no messages) and chats that only contain command/responses (detected via `_is_command_only()`).
-- **Missing Metadata**: Automatically adds missing fields from `DEFAULT_DATA` to existing chats.
-
-## Key Methods
-
-### Session Management
-| Method | Description |
-| :--- | :--- |
-| `new(category="general", title="", metadata={})` | Creates a new chat session with ULID-based ID, timestamps, and metadata. |
-| `clear()` | Deletes all messages from the current chat and resets token usage. |
-| `delete(id)` | Permanently removes a chat session by its ID. Adjusts current index if needed. |
-| `load(id)` | Loads an existing chat session into the current context by ID. |
-| `save()` | Saves the current chat data. Auto-creates a new chat if none is current. |
-
-### Message Operations
-| Method | Description |
-| :--- | :--- |
-| `get(index=None)` | Retrieves the full list of messages in the current chat. Auto-creates if none current. |
-| `add(message, ghost=False)` | Appends a new message. Handles auto-title, ghost flagging, and module `on_message_inject()` injection (e.g., timestamps). |
-| `pop(index=None)` | Removes a message at the given index (defaults to last). Returns new last index. |
-| `set(messages)` | Overwrites the entire message history. Auto-creates if none current. |
-| `delete_from(index)` | Deletes all messages from the given index onward (keeps up to and including the target). |
-| `get_message(index)` | Returns a specific message by index. |
-| `get_last_message_with_role(role, cutoff_index=None)` | Searches backwards for the last message with a given role. Useful for regenerating (targets the last user message before a cutoff). |
-
-### Metadata Operations
-| Method | Description |
-| :--- | :--- |
-| `get_title()` | Returns the current chat's title. |
-| `set_title(title)` | Sets the current chat's title. |
-| `get_category()` | Returns the current chat's category. |
-| `set_category(category)` | Sets the current chat's category. |
-| `get_categories()` | Collects and returns all unique categories across all chats. |
-| `get_tags()` | Returns the current chat's tags list. |
-| `set_tags(tags)` | Sets the current chat's tags (replaces all). |
-| `add_tag(tag)` | Adds a single tag (if not already present). |
-| `pop_tag(tag)` | Removes a single tag (if present). |
-| `get_data(data_key=None)` | Returns custom_data dict, or a specific key's value. |
-| `set_data(data_key, data_value)` | Sets a custom data key. |
-| `get_all()` | Returns the full list of all chat sessions. |
-| `get_id()` | Returns the current chat's ID string. |
-
-### Token Operations
-| Method | Description |
-| :--- | :--- |
-| `count_tokens(messages=None)` | Counts tokens using tiktoken (with model-aware encoding). Handles content, reasoning, tool calls, tool_call_ids, and names. Conservative counting: 3 tokens/message overhead + 1 for assistant priming. |
-| `get_token_usage()` | Returns current token usage. Prioritizes API data if `using_api_token_data` is True, otherwise falls back to local counting. |
-| `set_token_usage(usage)` | Sets the chat's token usage counter. |
-
-### Internal Methods
-| Method | Description |
-| :--- | :--- |
-| `_is_command_only(messages)` | Checks if a messages array contains only user commands and command responses (for cleanup). |
-| `_set_current(index)` | Sets the current chat index and saves it to a file for auto-resume. |
-| `_find_index(id)` | Finds the index of a chat by its ID string. |
-| `_count_text_tokens(text)` | Helper to encode text using tiktoken or fall back to character-based estimation. |
-
-## Instance Attributes
-
-| Attribute | Type | Description |
-| :--- | :--- | :--- |
-| `data` | `StorageList` | The persistent list of all chat sessions for this channel. |
-| `channel` | `Channel` | Reference to the owning channel. |
-| `current` | `int \| None` | Index of the current chat session. `None` if no chat is loaded. |
-| `current_save_path` | `str` | Path to the auto-resume file tracking the current chat index. |
-| `using_api_token_data` | `bool` | Flag set to `True` when the API first provides token usage data. |
-| `token_encoding` | `tiktoken.Encoding \| None` | The tiktoken encoder for the current model. |
-| `model_name` | `str \| None` | The current model name (used to detect encoding changes). |
-
-## `DEFAULT_DATA`
-
-Each chat session starts with these defaults:
+### Index File Format (msgpack)
+Each entry in the index is a dictionary:
 ```python
 {
-    "title": "",
-    "category": "general",
-    "tags": [],
-    "custom_data": {},
-    "token_usage": 0
+    "id": "abc12345",           # 8-character ULID-based identifier
+    "title": "New chat",        # Auto-generated from first message
+    "category": "general",      # Chat category for organization
+    "tags": [],                 # User-assigned tags
+    "token_usage": 1234,        # Estimated token count
+    "metadata": {},             # Custom metadata dictionary
+    "created": "2024-01-01T00:00:00",  # ISO timestamp
+    "updated": "2024-01-01T12:00:00"   # ISO timestamp
 }
 ```
 
-## Data Structure
-
-A single chat session is represented as a dictionary:
-
-```json
-{
-  "id": "8-char-ulid",
-  "title": "Chat Title",
-  "category": "general",
-  "tags": ["tag1", "tag2"],
-  "messages": [
+### History File Format (JSON)
+Contains the raw message array:
+```python
+[
     {"role": "user", "content": "Hello!"},
-    {"role": "assistant", "content": "Hi there!"}
-  ],
-  "custom_data": {
-    "character": "some_char_id"
-  },
-  "created": "ISO-timestamp",
-  "updated": "ISO-timestamp",
-  "token_usage": 1234
-}
+    {"role": "assistant", "content": "Hi there!"},
+    ...
+]
 ```
 
-Ghost messages include `"ghost": true` and are filtered out by `Context.get()`. Injection messages include `"injection": "..."` and are processed by `Context` to append system messages to user content.
+## Class: `Chat`
+
+### Initialization
+
+```python
+Chat(channel)
+```
+
+**Parameters:**
+- `channel` - The Channel instance that owns this chat
+
+**What happens:**
+1. Sets up the storage path for chats of this channel
+2. Checks for legacy format files and prompts for migration
+3. Initializes the index storage (msgpack format)
+4. Sets up the current chat tracker file
+
+### Methods
+
+#### `async autoload()`
+Automatically loads the last used chat or creates a new one.
+
+**Behavior:**
+- Checks if `auto_resume_chats` is enabled in config
+- Reads the `current` file to find the last active chat index
+- Loads that chat if it exists, otherwise creates a new chat
+- This is the primary constructor for the Chat class
+
+#### `async new(category="general", title="New chat", metadata=None)`
+Creates a new chat.
+
+**Parameters:**
+- `category` (str) - Category to organize the chat under (default: "general")
+- `title` (str) - Initial title (default: "New chat")
+- `metadata` (dict) - Custom metadata to store with the chat
+
+**Returns:**
+- The new chat's ID (8-character string)
+
+**Behavior:**
+- Generates a new ULID-based ID
+- Sets creation and update timestamps
+- Initializes token usage count from current context
+- Sets this chat as the current chat
+- Saves the index
+
+#### `async clear()`
+Clears the current chat's message history.
+
+**Behavior:**
+- Clears all messages via the Messages class
+- Resets token usage to 0
+- Updates the chat timestamp
+- Starts a prompt warmup (commented out in current code)
+
+**Returns:**
+- `True` on success
+
+#### `async delete(id)`
+Deletes a chat by its ID.
+
+**Parameters:**
+- `id` (str) - The chat ID to delete
+
+**Returns:**
+- The index of the newly active chat, or `False` if chat not found
+
+**Behavior:**
+- Removes the history file from disk
+- Removes the entry from the index
+- Adjusts the current chat index if needed
+  - If the deleted chat was current, loads the next available chat
+  - If no chats remain, auto-creates a new one
+
+#### `async save()`
+Saves the current chat's metadata to the index file.
+
+**Note:** If no chat is currently loaded, this calls `new()` to create one.
+
+#### `async load(id)`
+Loads a chat by its ID.
+
+**Parameters:**
+- `id` (str) - The chat ID to load
+
+**Returns:**
+- `True` if a different chat was loaded
+- `False` if the same chat was already active
+- Raises `Exception` if chat ID is invalid
+
+#### `async export()`
+Exports the current chat history to a human-readable format.
+
+**Returns:**
+- A formatted string containing the chat history in a turn-based format
+
+**Format:**
+```
+--- user ---
+Hello!
+
+--- assistant ---
+Hi there! How can I help?
+```
+
+Tool calls are displayed with their arguments, and content is grouped by type.
+
+#### `get(key=None, default=None, index=None)`
+Retrieves metadata from the current chat.
+
+**Parameters:**
+- `key` (str, optional) - The metadata key to retrieve
+- `default` - Default value if key doesn't exist
+- `index` (int, optional) - Retrieve from a specific chat index
+
+**Returns:**
+- If `key` is `None`: returns the entire chat metadata dict
+- If `key` is provided: returns the value for that key, or `default`
+
+#### `async search(query, max_results=100)`
+Searches across all chats for messages matching a query.
+
+**Parameters:**
+- `query` (str) - Search query (case-insensitive)
+- `max_results` (int) - Maximum number of results to return
+
+**Returns:**
+- List of chat metadata dicts with search results, including:
+  - `title_match` (bool) - Whether the query matched the title
+  - `messages_found` (int) - Number of matching messages
+  - `message_snippets` (list) - Snippets around each match
+
+**Behavior:**
+- Searches both chat titles and message content
+- Generates context snippets (50 characters before/after match)
+- Sorts results: title matches first, then by most recent
+- Handles multimodal content by extracting text parts
+
+#### `async set(key, value, index=None)`
+Sets a metadata value on the current chat.
+
+**Parameters:**
+- `key` (str) - The metadata key
+- `value` - The value to set
+- `index` (int, optional) - Set on a specific chat index
+
+**Returns:**
+- `True` on success
+- Raises `Exception` if key is not a valid chat property
+
+#### `get_all()`
+Returns all chats sorted by update time.
+
+**Returns:**
+- List of chat metadata dicts, sorted by `updated` field (most recent first)
+
+#### `get_categories()`
+Returns all unique categories used across chats.
+
+**Returns:**
+- List of category strings
+
+## Migration System
+
+OpenLumara includes an automatic migration system for upgrading from older chat formats.
+
+### Legacy Format
+Old versions stored chats in a single JSON file per channel:
+```
+data/<channel_name>_chats.json
+```
+
+### Migration Process
+1. Detected on Chat initialization
+2. Shows a warning with backup instructions
+3. Waits for user to type `MIGRATE` in caps
+4. Creates new directory structure
+5. Migrates each chat's messages to individual JSON files
+6. Creates new msgpack index
+7. Backs up old files to `chat_migration_backups/`
+
+**Safety:** Always creates a backup before migrating. Users are instructed to make their own backup first.
+
+## Chat ID Generation
+
+Chat IDs are generated using truncated ULIDs (Unique Locally-Identifiable Identifiers):
+```python
+new_id = str(ulid.ULID())[-8:]
+```
+
+The last 8 characters are used to keep IDs short while maintaining reasonable uniqueness. The code notes that truncation can theoretically lead to collisions, but this is rare in practice.
+
+## Token Usage Tracking
+
+Each chat tracks its estimated token usage:
+- Set on chat creation from current context token count
+- Updated when token usage is received from the API
+- Used for context window management and display in status commands
+- Stripped multimodal content is removed from older messages to save tokens
+
+## Best Practices
+
+1. **Always check `self.current` before operations** - Many methods require an active chat
+2. **Use `async load()` instead of manual index manipulation** - Ensures proper state
+3. **Handle migration warnings seriously** - Always backup before migrating
+4. **Use `get_categories()` for UI organization** - Returns all available categories
+5. **Respect the `max_results` limit in search** - Prevents excessive memory usage
