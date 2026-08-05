@@ -135,7 +135,9 @@
         </div>
 
         <!-- make sure there's always more chats than the viewport -->
-        <div id="chat-scroll-loader" x-intersect="$store.chat.loadMoreChats()"></div>
+        <template x-if="$store.chat.hasMoreChats">
+            <div id="chat-scroll-loader" x-intersect="$store.chat.loadMoreChats()" class="item">loading more..</div>
+        </template>
     </div>
 
     <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">

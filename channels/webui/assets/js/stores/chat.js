@@ -67,7 +67,6 @@ CHAT_STORE = {
     async reloadChats() {
         this.chatOffset = 0;
         this.visibleChats = [];
-        this.hasMoreChats = true;
         await this._fetchChats();
 
         // ensure there are always more chats loaded than what fits in the current viewport
