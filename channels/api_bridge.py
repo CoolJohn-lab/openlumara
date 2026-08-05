@@ -4,42 +4,19 @@ import time
 import uuid
 import uvicorn
 import json
-import time
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Union
+import socket
+import fastapi
+import fastapi.responses
+import fastapi.middleware.cors
 
 # -------------------------
-#   MODELS (OpenAI Spec)
+#   CONFIGURATION
 # -------------------------
-
-class ChatMessage(BaseModel):
-    role: str
-    content: Optional[str] = None
-    name: Optional[str] = None
-
-class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[ChatMessage]
-    stream: Optional[bool] = False
-    temperature: Optional[float] = 1.0
-    top_p: Optional[float] = 1.0
-    n: Optional[int] = 1
-    max_tokens: Optional[int] = None
-    stop: Optional[Union[str, List[str]]] = None
-    presence_penalty: Optional[float] = 0.0
-    frequency_penalty: Optional[float] = 0.0
 
 class ApiBridge(core.channel.Channel):
     """
     Lets you use any application or UI (for example, koboldlite, openwebui, etc) to talk to your OpenLumara instance. Simply connect your chosen application to the port you specify in this channel's settings.
     """
-
-    # -------------------------
-    #   CONFIGURATION
-    # -------------------------
 
     settings = {
         "network_mode": {
@@ -106,13 +83,11 @@ class ApiBridge(core.channel.Channel):
 
     async def run(self):
         """The main loop: Starts the FastAPI server."""
-        import socket
-        
-        app = FastAPI(title="OpenLumara OpenAI Bridge")
+        app = fastapi.FastAPI(title="OpenLumara OpenAI Bridge")
 
         # allow requests from any origin
         app.add_middleware(
-            CORSMiddleware,
+            fastapi.middleware.cors.CORSMiddleware,
             allow_origins=["*"],
             allow_methods=["*"],
             allow_headers=["*"]
@@ -120,11 +95,11 @@ class ApiBridge(core.channel.Channel):
 
         # require API key if set up that way
         @app.middleware("http")
-        async def auth_middleware(request: Request, call_next):
+        async def auth_middleware(request: fastapi.Request, call_next):
             if self.config.get("api_key_required"):
                 auth_header = request.headers.get("Authorization")
                 if not auth_header or auth_header != f"Bearer {self.config.get('api_key')}":
-                    return JSONResponse(
+                    return fastapi.responses.JSONResponse(
                         status_code=401,
                         content={"error": {"message": "Invalid API key", "type": "invalid_request_error", "param": None, "code": "invalid_api_key"}}
                     )
@@ -132,10 +107,11 @@ class ApiBridge(core.channel.Channel):
 
         @app.get("/v1")
         async def index():
-            return RedirectResponse("/v1/health", status_code=307)
+            return fastapi.responses.RedirectResponse("/v1/health", status_code=307)
+
         @app.post("/v1")
         async def completions_redirect():
-            return RedirectResponse("/v1/chat/completions", status_code=307)
+            return fastapi.responses.RedirectResponse("/v1/chat/completions", status_code=307)
 
         @app.get("/v1/health")
         async def health():
@@ -155,22 +131,22 @@ class ApiBridge(core.channel.Channel):
             }
 
         @app.post("/v1/chat/completions")
-        async def chat_completions(request: Request):
+        async def chat_completions(request: fastapi.Request):
             body = await request.json()
-            chat_req = self.ChatCompletionRequest(**body)
-
-            if not chat_req.messages:
-                raise HTTPException(status_code=400, detail="No messages provided")
             
-            last_msg = chat_req.messages[-1]
+            if not body.get("messages"):
+                raise fastapi.HTTPException(status_code=400, detail="No messages provided")
+            
+            last_msg = body["messages"][-1]
+            stream = body.get("stream", False)
 
-            if chat_req.stream:
-                return StreamingResponse(
-                    self._stream_handler(last_msg.content, chat_req.model),
+            if stream:
+                return fastapi.responses.StreamingResponse(
+                    self._stream_handler(last_msg.get("content", ""), "openlumara"),
                     media_type="text/event-stream"
                 )
             else:
-                return await self._completion_handler(last_msg.content, chat_req.model)
+                return await self._completion_handler(last_msg.get("content", ""), body.get("model", "openlumara"))
 
         # Start the server with SO_REUSEADDR to handle "address already in use" errors
         # Create a socket with SO_REUSEADDR
@@ -191,7 +167,6 @@ class ApiBridge(core.channel.Channel):
         except Exception as e:
             self.log("api bridge", f"Error while starting API bridge: {core.detail_error(e)}")
 
-
     async def on_shutdown(self):
         # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
         self.server.should_exit = True
@@ -205,7 +180,7 @@ class ApiBridge(core.channel.Channel):
 
         self.log("api bridge", "API bridge server shut down successfully.")
 
-    async def _completion_handler(self, message: str, model: str) -> JSONResponse:
+    async def _completion_handler(self, message, model):
         try:
             # send the request to the framework and format it
             response_dict = await self.send(message, commands_authorized=True)
@@ -213,7 +188,7 @@ class ApiBridge(core.channel.Channel):
             content = response_dict.get("content", "")
 
             # return the response as a full openAI-compatible json object
-            return JSONResponse({
+            return fastapi.responses.JSONResponse({
                 "id": f"chatcmpl-{uuid.uuid4()}",
                 "object": "chat.completion",
                 "created": int(time.time()),
@@ -234,12 +209,12 @@ class ApiBridge(core.channel.Channel):
             })
         except Exception as e:
             self.log(self.name, f"Error in completion: {str(e)}")
-            return JSONResponse(
+            return fastapi.responses.JSONResponse(
                 status_code=500,
                 content={"error": {"message": str(e), "type": "server_error", "param": None, "code": "internal_error"}}
             )
 
-    async def _stream_handler(self, message: str, model: str):
+    async def _stream_handler(self, message, model):
         try:
             chat_id = f"chatcmpl-{uuid.uuid4()}"
             created_time = int(time.time())
@@ -260,10 +235,10 @@ class ApiBridge(core.channel.Channel):
                 yield "data: [DONE]\n\n"
 
         except Exception as e:
-            self.log(self.name, f"Error in stream: {str(e)}")
+            self.log(self.name, f"Error in stream: {core.detail_error(e)}")
             yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
 
-    def _openai_chunk(self, chat_id: str, created: int, model: str, delta: str) -> str:
+    def _openai_chunk(self, chat_id, created, model, delta):
         chunk = {
             "id": chat_id,
             "object": "chat.completion.chunk",

@@ -131,6 +131,9 @@ class Context:
         # now we inject anything modules want to inject into the user messages
         for message in messages:
             metadata = message.get("_metadata")
+            if not metadata:
+                continue
+
             if metadata.get("injection"):
                 if message.get("role") == "user":
                     content = message.get("content")
