@@ -291,6 +291,8 @@ class Manager:
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
         except KeyboardInterrupt:
             pass
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             if core.debug:
                 import traceback

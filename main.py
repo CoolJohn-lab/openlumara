@@ -77,8 +77,15 @@ async def main_loop(arg_list):
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
-    result = await manager.run()
-    del(manager) # wipe it all
+    try:
+        result = await manager.run()
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        print(f"Error: {core.detail_error(e)}")
+    finally:
+        del(manager) # wipe it all
+
     return result
 
 def run_from_args(arg_list: list = []):
