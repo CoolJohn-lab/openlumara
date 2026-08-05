@@ -7,7 +7,10 @@ function renderMarkdown(text) {
     // parse the markdown to HTML
     let html = marked.parse(text);
 
-    // syntax hightlighting
+    // protect against XSS
+    html = DOMPurify.sanitize(html);
+
+    // syntax highlighting
     if (typeof hljs !== 'undefined') {
         _tempHighlightDiv.innerHTML = html;
 
@@ -18,9 +21,6 @@ function renderMarkdown(text) {
 
         html = _tempHighlightDiv.innerHTML;
     }
-
-    // protect against XSS
-    html = DOMPurify.sanitize(html);
 
     // add the copy button to all pre statements using a custom alpine directive
     // (defined in directives/copy-code.js)

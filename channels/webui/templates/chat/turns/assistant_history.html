@@ -5,7 +5,7 @@
     </template>
 
     <!-- Content block -->
-    <template x-if="(Object.hasOwn(message, 'content') || message.type === 'content') && typeof message.content === 'string'">
+    <template x-if="message.role === 'assistant' && (Object.hasOwn(message, 'content') || message.type === 'content') && typeof message.content === 'string'">
         <div>
             <template x-if="$store.chat.editingMessageIndex !== turn.last_message_index">
                 <div>
