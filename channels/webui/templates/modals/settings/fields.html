@@ -225,7 +225,7 @@
                         <input type="text" :value="setting.value" placeholder="Enter model name" 
                                @input="updateSetting(setting, $event.target.value)">
                     </template>
-                    <button type="button" @click="fetchModels()" class="model-refresh-btn"
+                    <button type="button" @click="$store.settings.fetchModels()" class="model-refresh-btn"
                             :title="$store.settings.cachedModels && $store.settings.cachedModels.length > 0 ? 'Refresh model list' : 'Load models from API'">
                             {% include 'svg/reload.svg' %}
                     </button>
