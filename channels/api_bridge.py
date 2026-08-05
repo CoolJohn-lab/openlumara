@@ -11,6 +11,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 
+# -------------------------
+#   MODELS (OpenAI Spec)
+# -------------------------
+
+class ChatMessage(BaseModel):
+    role: str
+    content: Optional[str] = None
+    name: Optional[str] = None
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: List[ChatMessage]
+    stream: Optional[bool] = False
+    temperature: Optional[float] = 1.0
+    top_p: Optional[float] = 1.0
+    n: Optional[int] = 1
+    max_tokens: Optional[int] = None
+    stop: Optional[Union[str, List[str]]] = None
+    presence_penalty: Optional[float] = 0.0
+    frequency_penalty: Optional[float] = 0.0
+
 class ApiBridge(core.channel.Channel):
     """
     Lets you use any application or UI (for example, koboldlite, openwebui, etc) to talk to your OpenLumara instance. Simply connect your chosen application to the port you specify in this channel's settings.
@@ -61,27 +82,6 @@ class ApiBridge(core.channel.Channel):
 
     dependencies = ["fastapi", "uvicorn"]
     # pydantic and httpx are already included with openlumara
-
-    # -------------------------
-    #   MODELS (OpenAI Spec)
-    # -------------------------
-
-    class ChatMessage(BaseModel):
-        role: str
-        content: Optional[str] = None
-        name: Optional[str] = None
-
-    class ChatCompletionRequest(BaseModel):
-        model: str
-        messages: List[ChatMessage]
-        stream: Optional[bool] = False
-        temperature: Optional[float] = 1.0
-        top_p: Optional[float] = 1.0
-        n: Optional[int] = 1
-        max_tokens: Optional[int] = None
-        stop: Optional[Union[str, List[str]]] = None
-        presence_penalty: Optional[float] = 0.0
-        frequency_penalty: Optional[float] = 0.0
 
     # -------------------------
     #   EVENT HANDLERS
