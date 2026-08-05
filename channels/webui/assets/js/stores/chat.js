@@ -6,7 +6,6 @@ CHAT_STORE = {
     visibleChats: [],
     chatOffset: 0,
     chatLimit: 10,
-    chatsLoading: false,
     hasMoreChats: true,
 
     categories: [],
@@ -86,10 +85,8 @@ CHAT_STORE = {
     },
 
     async loadMoreChats() {
-        if (this.chatsLoading || !this.hasMoreChats) { return; }
-        this.chatsLoading = true;
+        if (!this.hasMoreChats) { return; }
         await this._fetchChats();
-        this.chatsLoading = false;
     },
 
     async ensureMoreChats(el) {
