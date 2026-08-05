@@ -8,7 +8,7 @@
                             <span x-html="block.text"></span>
                         </template>
 
-                        <template x-if="blockIndex > 0">
+                        <template x-if="blockIndex > 0 && message._metadata?.filenames">
                             <div class="text-preview">
                                 {% include 'svg/paperclip.svg' %}
                                 <span x-text="message._metadata.filenames[blockIndex]"></span>
