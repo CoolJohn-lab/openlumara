@@ -87,8 +87,10 @@ THEME_STORE = {
         root.style.setProperty('--message-max-width', `${messageWidth}%`);
 
         // Apply theme vars on top of base
-        for (const [varName, value] of Object.entries(finalTheme)) {
-            root.style.setProperty(varName, value);
+        if (finalTheme) {
+            for (const [varName, value] of Object.entries(finalTheme)) {
+                root.style.setProperty(varName, value);
+            }
         }
 
         // Switch code syntax highlighting theme based on mode
