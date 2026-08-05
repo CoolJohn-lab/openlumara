@@ -51,6 +51,8 @@ class Messages:
         """add message to current chat"""
         # make a copy so we don't modify the original reference
         new_message = message.copy()
+        if "_metadata" not in new_message.keys():
+            new_message["_metadata"] = {}
 
         if (not self.chat.get("title") or self.chat.get("title") == "New chat") and message.get("role") == "user" and not cmd:
             # auto-set title (if the message was not a command)
@@ -64,11 +66,11 @@ class Messages:
         # if marked as a ghost message, set the flag. gets handled in self.trim()
         # ghost messages are invisible to the AI
         if ghost:
-            new_message["ghost"] = True
+            new_message["_metadata"]["ghost"] = True
 
         if cmd:
             # if the message is a command (or command response), mark it as such
-            new_message["is_cmd"] = True
+            new_message["_metadata"]["is_cmd"] = True
 
         # inject any special messages coming from on_message_inject() in modules, such as timestamps
         injections = []
@@ -83,7 +85,7 @@ class Messages:
                         self.channel.log("module error", f"{module.name}: in on_message_inject(): {core.detail_error(e)}")
 
             if injections:
-                new_message["injection"] = "\n\n".join(injections)
+                new_message["_metadata"]["injection"] = "\n\n".join(injections)
 
         self.data.append(new_message)
 

@@ -9,7 +9,7 @@
         <div>
             <template x-if="$store.chat.editingMessageIndex !== turn.last_message_index">
                 <div>
-                    <div class="content" x-html="message.is_cmd ? escapeHtml(message.content) : renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
+                    <div class="content" x-html="message._metadata.is_cmd ? escapeHtml(message.content) : renderMarkdown(message.content)" :class="{'command': message._metadata.is_cmd}"></div>
                 </div>
             </template>
             <template x-if="$store.chat.editingMessageIndex === turn.last_message_index">

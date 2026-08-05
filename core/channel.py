@@ -254,17 +254,22 @@ class Channel:
 
         # if no files were provided, just return the content unmodified
         if not files:
-            return message
+            return {"role": "user", "content": message}
+
+        filenames = []
 
         # otherwise add the text message as a text block
         if message:
             content_blocks.append({"type": "text", "text": message})
+            filenames.append("") # so that indexes match
 
         format_map = {
             "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
             "audio/ogg": "ogg", "audio/flac": "flac",
             "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
         }
+
+        message_dict = {"role": "user"}
 
         for filename, file_data in files.items():
             if not file_data:
@@ -322,10 +327,14 @@ class Channel:
                         "text": f"[Binary file: {filename}]"
                     })
 
-        if content_blocks:
-            return content_blocks
+            filenames.append(filename)
 
-        return message
+        if content_blocks:
+            message_dict["content"] = content_blocks
+            message_dict["_metadata"] = {"filenames": filenames}
+            return message_dict
+
+        return {"role": "user", "content": message}
 
     def format_message(self, orig_message: dict):
         formatted = ""
@@ -446,10 +455,10 @@ class Channel:
                     user_message = usr_msg_result
 
         # apply multimodal content if applicable
-        user_message = await self._process_multimodal(message=user_message, files=files)
+        user_message_processed = await self._process_multimodal(message=user_message, files=files)
 
         # and add the user's message to context
-        add_success = await self.context.chat.messages.add({"role": "user", "content": user_message})
+        add_success = await self.context.chat.messages.add(user_message_processed)
         if not add_success:
             return {"type": "error", "content": "Unknown error while adding user message to context"}
 
@@ -462,7 +471,7 @@ class Channel:
         context = await self.context.get(system_prompt=True, end_prompt=True)
 
         # and return the results for use in send() and send_stream()
-        return {"type": "ready", "user_message": user_message, "context": context}
+        return {"type": "ready", "user_message": user_message_processed.get("content"), "context": context}
 
     async def _send_postprocess(self, assistant_message):
         await self.context.chat.messages.add(assistant_message)

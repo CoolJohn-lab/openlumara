@@ -120,6 +120,10 @@
     }
 }
 
+.text-preview {
+    padding: 10px;
+}
+
 /* Image preview modal */
 .image-modal {
     position: fixed;

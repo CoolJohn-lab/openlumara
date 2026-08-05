@@ -4,7 +4,7 @@ import json
 class Context:
     # special message type (not intended to be added to context) that
     # will cause context.get() to cut off messages before this cutoff point
-    SUMMARIZATION_CUTOFF = {"signal": "SUMMARIZATION_CUTOFF"}
+    SUMMARIZATION_CUTOFF = {"_metadata": {"signal": "SUMMARIZATION_CUTOFF"}}
 
     def __init__(self, channel):
         self.channel = channel
@@ -63,12 +63,12 @@ class Context:
 
             # find the last occurence of it and return only the messages from that point onward
             for i in range(len(messages) - 1, -1, -1):
-                if messages[i].get("signal") == "SUMMARIZATION_CUTOFF":
+                if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
                     messages = [{"role": "user", "content": "Summarize our chat so far."}] + messages[i + 1:]
                     break
 
             # Remove ghost messages and signal messages from history
-            messages = [msg for msg in messages if not msg.get("ghost") and not msg.get("signal")]
+            messages = [msg for msg in messages if not msg.get("_metadata", {}).get("ghost") and not msg.get("_metadata", {}).get("signal")]
 
             # Strip invalid assistant messages (those without content or tool calls)
             messages = [
@@ -130,14 +130,18 @@ class Context:
 
         # now we inject anything modules want to inject into the user messages
         for message in messages:
-            if message.get("injection"):
+            metadata = message.get("_metadata")
+            if metadata.get("injection"):
                 if message.get("role") == "user":
                     content = message.get("content")
                     if content and isinstance(content, str):
-                        message["content"] += f"\n\n{message['injection']}"
+                        message["content"] += f"\n\n{metadata['injection']}"
 
         # remove any non-standard (metadata) fields from the messages
         # so that we can cleanly send it to the API
+        # we cant just remove only the _metadata field because old chat history used to use metadata fields
+        # straight on the message object itself without containing it into a _metadata array,
+        # so we need to be aggressive here
         approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
         messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
 
