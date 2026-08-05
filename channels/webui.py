@@ -172,7 +172,18 @@ class Webui(core.channel.Channel):
         self.log("webui", f"Starting WebUI on {self.url}")
 
         # serve the app using uvicorn
-        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="error")
+        config = uvicorn.Config(
+            self.app,
+            host=self.host,
+            port=self.port,
+
+            # this makes it work in situations where https and http content are served mixed
+            proxy_headers=True,
+            forwarded_allow_ips = "127.0.0.1",
+
+            # only log critical http errors
+            log_level="error"
+        )
         self.server = uvicorn.Server(config)
 
         await self.server.serve()
