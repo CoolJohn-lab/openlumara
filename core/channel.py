@@ -248,6 +248,10 @@ class Channel:
         """
         content_blocks = []
 
+        # if the message was a list... this was already multimodal, so dont modify
+        if isinstance(message, list):
+            return {"role": "user", "content": message}
+
         if not message and not files:
             # wtf why would you do that
             return None
@@ -425,41 +429,42 @@ class Channel:
         if isinstance(user_message, dict):
             user_message = user_message.get("content", "")
 
-        # process any commands
-        is_cmd = user_message.strip().lower().startswith(
-            core.config.get("core", "cmd_prefix").strip().lower()
-        )
+        if isinstance(user_message, str):
+            # process any commands
+            is_cmd = user_message.strip().lower().startswith(
+                core.config.get("core", "cmd_prefix").strip().lower()
+            )
 
-        if is_cmd:
-            try:
-                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
-            except Exception as e:
-                self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
-                # no need to add a message to context here, as process_input() already does that
-                return {"type": "error", "content": str(core.detail_error(e))}
-
-            if cmd_response:
-                # process_input already adds to context
-                return {"type": "cmd_response", "content": str(cmd_response), "is_cmd": True}
-            else:
-                return {"type": "blank"}
-
-        # apply any on_user_message() hooks
-        for module_name, module in self.manager.modules.items():
-            if hasattr(module, "on_user_message"):
+            if is_cmd:
                 try:
-                    if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(user_message)
-                    else:
-                        usr_msg_result = module.on_user_message(user_message)
+                    cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
                 except Exception as e:
-                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+                    self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
+                    # no need to add a message to context here, as process_input() already does that
+                    return {"type": "error", "content": str(core.detail_error(e))}
 
-                if usr_msg_result is False:
-                    await self.context.chat.messages.add({"role": "user", "content": user_message})
-                    return {"type": "module_intercept"}
-                elif usr_msg_result is not None:
-                    user_message = usr_msg_result
+                if cmd_response:
+                    # process_input already adds to context
+                    return {"type": "cmd_response", "content": str(cmd_response), "is_cmd": True}
+                else:
+                    return {"type": "blank"}
+
+            # apply any on_user_message() hooks
+            for module_name, module in self.manager.modules.items():
+                if hasattr(module, "on_user_message"):
+                    try:
+                        if asyncio.iscoroutinefunction(module.on_user_message):
+                            usr_msg_result = await module.on_user_message(user_message)
+                        else:
+                            usr_msg_result = module.on_user_message(user_message)
+                    except Exception as e:
+                        self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+
+                    if usr_msg_result is False:
+                        await self.context.chat.messages.add({"role": "user", "content": user_message})
+                        return {"type": "module_intercept"}
+                    elif usr_msg_result is not None:
+                        user_message = usr_msg_result
 
         # apply multimodal content if applicable
         user_message_processed = await self._process_multimodal(message=user_message, files=files)
