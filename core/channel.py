@@ -418,6 +418,13 @@ class Channel:
         await self._set_as_active_channel()
         user_message = message
 
+        # sometimes legacy parts of the openlumara framework still send dicts.
+        # that is not supposed to happen, and i need to find the code that does it
+        # so, TODO: find the legacy code that calls channel.send()/send_stream() with dicts
+        # but for now.. to avoid breaking everything, i'll convert
+        if isinstance(user_message, dict):
+            user_message = user_message.get("content", "")
+
         # process any commands
         is_cmd = user_message.strip().lower().startswith(
             core.config.get("core", "cmd_prefix").strip().lower()
