@@ -361,7 +361,7 @@ class WritingStyle(core.module.Module):
                 constraints.append("Lists: No bold headers at start of items.")
 
         if self.config.get("forbid_em_dash"):
-            constraints.append("No Em dashes (—).")
+            constraints.append("Don't use `—`, use `-` instead")
 
         if self.config.get("forbid_markdown"):
             constraints.append("Don't use markdown")
