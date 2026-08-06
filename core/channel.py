@@ -748,10 +748,9 @@ class Channel:
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type == "prompt_progress":
-                yield token
-            elif token_type == "error":
-                yield token
+            if token_type == "error":
+                yield text_to_token(token.get("content"))
+                return
 
             # # collapse consecutive newlines
             try:
