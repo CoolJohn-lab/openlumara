@@ -1040,7 +1040,7 @@ class WebSocketManager:
                 elif partial.get("type") == "turn":
                     await self.broadcast({
                         "type": "turn_stream",
-                        "turns": partial.get("content")
+                        "turn": partial.get("content")
                     })
         finally:
             # always finalize the stream, no matter what

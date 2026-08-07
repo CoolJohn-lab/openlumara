@@ -117,22 +117,42 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "turn_stream":
-            stream.turn = data.turns;
+            const segment = data.turn;
 
-            // always scroll to the bottom upon a token coming in
+            if (stream.turn.length <= 0) {
+                stream.turn = {role: "assistant", messages: []};
+            }
+
+            // check if this updates the last segment or starts a new one
+            const last_idx = stream.turn.messages.length - 1;
+            const last_segment = stream.turn.messages[last_idx];
+
+            // same type and same tool_call_id = update existing segment
+            const is_update = last_segment &&
+                              last_segment.type === segment.type &&
+                              last_segment.tool_call_id === segment.tool_call_id;
+
+            if (is_update) {
+                // backend sends FULL accumulated content, so replace in place
+                stream.turn.messages[last_idx] = segment;
+            } else {
+                // new segment type (or new tool response), push it
+                stream.turn.messages.push(segment);
+            }
+
+            // scroll
             await ui.scrollToBottom();
 
-            // process depending on what segment we're in
-            const current_segment = stream.turn.messages[stream.turn.messages.length-1]
+            // handle state based on the current segment
+            const current_segment = stream.turn.messages[stream.turn.messages.length - 1];
             const segment_type = current_segment.type;
+
             switch (segment_type) {
                 case "reasoning":
                     stream.state = 'thinking';
                     stream.processing = {};
-
                     AudioManager.stopProcessingSound();
                     AudioManager.play("token");
-
                     if (!responseSoundPlayed) {
                         AudioManager.play("response_start");
                         responseSoundPlayed = true;
@@ -141,19 +161,24 @@ async function handleWebSocketMessage(data) {
                 case "content":
                     stream.state = 'streaming';
                     stream.processing = {};
-
                     AudioManager.stopProcessingSound();
                     AudioManager.play("token");
-
                     if (!responseSoundPlayed) {
                         AudioManager.play("response_start");
                         responseSoundPlayed = true;
                     }
                     break;
+                case "tool_calls":
+                    stream.state = 'calling_tools';
+                    stream.processing = {};
+                    break;
+                case "tool":
+                    stream.state = 'processing_tools';
+                    AudioManager.playProcessingSound();
+                    break;
             }
 
             if (current_segment.is_cmd) {
-                // reload the global state in case something changed due to the command
                 await chat.reloadChats();
                 await chat.reloadCategories();
             }

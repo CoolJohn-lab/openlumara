@@ -105,6 +105,8 @@ class TurnCollector:
         # then once it calls a tool, create a tool segment,
         # then once it reasons again, **we create a new reasoning segment seperate from the previous one**
 
+        # we yield the segment that's currently being written
+
         # this way, we can display each segment throughout the UI, seperately,
         # using whatever layout and components we want!
 
@@ -206,10 +208,13 @@ class TurnCollector:
                             tool["response"] = stream_response_map[tool["id"]]
 
             # collect it all into one turn object that dynamically updates as tokens come in
-            streaming_turn = {
-                "role": "assistant",
-                "messages": display_segments
-            }
+            # streaming_turn = {
+            #     "role": "assistant",
+            #     "messages": display_segments
+            # }
 
             # aaand yield!
-            yield {"type": "turn", "content": streaming_turn}
+            # instead of what i did before, where it yields the entire data array on every yield,
+            # i changed it to only yield the current segment.
+            # this works better for thing like TUI's
+            yield {"type": "turn", "content": display_segments[-1]}

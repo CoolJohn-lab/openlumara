@@ -1,5 +1,7 @@
 import os
 
+version = 1.0
+
 quiet = False
 debug = False
 debug_stream = False

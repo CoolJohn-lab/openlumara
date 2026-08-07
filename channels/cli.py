@@ -1,24 +1,22 @@
 import core
-import os
+import readline
 import asyncio
-import prompt_toolkit
-import prompt_toolkit.patch_stdout
-import prompt_toolkit.history
-import prompt_toolkit.styles
-import prompt_toolkit.formatted_text
-import prompt_toolkit.key_binding
-import prompt_toolkit.shortcuts
-import prompt_toolkit.application
-import sys
-import shlex
+import concurrent.futures
+
+import rich
+import rich.console
+import rich.text
+import rich.status
+import rich.progress
+import rich.markdown
+import rich.traceback
+
+def plaintext(text):
+    """helper that makes the Rich library not auto-color text"""
+
+    return rich.text.Text(text)
 
 class Cli(core.channel.Channel):
-    """Talk to your AI from the terminal! Auto-disables itself when ran as a background server."""
-
-    dependencies = ["prompt_toolkit", "partial-json-parser"]
-
-    running = True
-
     settings = {
         "show_reasoning": {
             "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
@@ -30,147 +28,103 @@ class Cli(core.channel.Channel):
         }
     }
 
-    def _setup_style(self):
-        self.style = prompt_toolkit.styles.Style.from_dict({
-            "prompt": "ansicyan bold"
-            # "reasoning-label": "ansiyellow bold",
-            # "conclusion-label": "ansimagenta bold",
-            # "toolcall-response-label": "ansiblue bold",
-            # "error": "ansired bold",
-            # "status": "ansiblue",
-            # "separator": "ansigray",
-        })
+    dependencies = ["rich"]
 
-    def _setup_history(self):
-        history_file = os.path.join(core.get_data_path(), "cli_history")
-        self.history = prompt_toolkit.history.FileHistory(str(history_file))
+    async def on_ready(self):
+        self.console = rich.console.Console()
+        self.console.print(plaintext("-"*40))
 
-    def _get_prompt(self):
-        return prompt_toolkit.formatted_text.HTML(
-            "<prompt>user</prompt>> "
-        )
+        self.console.print(plaintext(f"Welcome to OpenLumara V{core.version}"))
+        self.console.print("Type /new to start a new session, /help for help, /chats to see your chats")
+        self.console.print("Type /quit or /exit to quit")
+        self.console.print(plaintext("-"*40))
 
-    def _print_formatted(self, text, style_class=None):
-        if style_class:
-            formatted = prompt_toolkit.formatted_text.HTML(
-                f"<{style_class}>{text}</{style_class}>"
-            )
-            prompt_toolkit.shortcuts.print_formatted_text(formatted, style=self.style)
-        else:
-            print(text, end="", flush=True)
+        # install rich's traceback handler
+        rich.traceback.install(show_locals=True)
 
-    async def _process_message(self, msg):
-        message_state = None
-        # Create a fresh renderer for this message session
-        currently_reasoning = False
-
-        # special commands like /quit
-        message_after = None
-
-        words = shlex.split(msg)
-        cmd_prefix = core.config.get("core", "cmd_prefix")
-        cmd = words[0][len(cmd_prefix):]
-
-        if cmd in ("quit", "exit"):
-                print("Exiting..")
-                await self.manager.shutdown()
-                return
-        elif cmd == "help":
-            # append the extra commands to the /help
-            message_after = """
----
-/quit           quits the program
-/exit           quits the program
-""".strip()
-
-        # display sending indicator
-        print("sending..", end="", flush=True)
-
-        first_token_received = False
-        processing_prompt = False
-        async for token in self.format_stream_for_text(
-            self.send_stream(msg, commands_authorized=True),
-            use_markdown=False
-        ):
-            token_type = token.get("type")
-            content = token.get("content", "")
-
-            if token_type == "error":
-                print()
-                self.log(self.name, f"Error: {content}")
-            elif token_type == "prompt_progress":
-                print("\rprocessing your request..", end="", flush=True)
-                processing_prompt = True
-            elif token_type in ["content", "reasoning"]:
-                if not first_token_received:
-                    # remove sending indicator using \r
-                    process_padding = 25 if processing_prompt else 0 # 25 is the length of "processing your request.."
-
-                    print("\r"+" "*process_padding, end="", flush=True)
-                    print("\r", end="", flush=True)
-
-                    processing_prompt = False
-                    first_token_received = True
-
-                print(content, end="", flush=True)
-
-        if message_after:
-            print(message_after)
-
-        print()
+    async def _get_input(self):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, input, "user> ")
 
     async def run(self):
-        if not sys.stdin.isatty():
-            return False
+        while True:
+            try:
+                user_input = await self._get_input()
+            except (KeyboardInterrupt, EOFError):
+                self.console.print()
+                await self.manager.shutdown()
+                break
 
-        self._setup_style()
-        self._setup_history()
+            _, cmd, _ = await self.commands._extract_cmd(user_input)
+            if cmd in ("quit", "exit"):
+                await self.manager.shutdown()
+                break
 
-        prompt_session = prompt_toolkit.PromptSession(
-            history=self.history,
-            style=self.style,
-            multiline=False,
-            mouse_support=False,
-            enable_system_prompt=True,
-            enable_suspend=True,
-            search_ignore_case=True
-        )
+            processing_prompt = False
+            first_processing_prompt = True
+            progress = rich.progress.Progress(expand=False, transient=False)
+            progress_task = None
 
-        with prompt_toolkit.patch_stdout.patch_stdout():
-            while self.running:
-                try:
-                    msg = await prompt_session.prompt_async(
-                        self._get_prompt(),
-                        refresh_interval=0.5,
-                        set_exception_handler=False
-                    )
-                except KeyboardInterrupt:
-                    await self.manager.shutdown()
-                    break
+            sending_prompt = True
+            sending = rich.status.Status("Sending", console=self.console)
+            sending.start()
+            try:
+                async for token in self.format_stream_for_text(
+                    self.send_stream(user_input, commands_authorized=True),
+                    use_markdown=False
+                ):
+                    token_type = token.get("type")
+                    token_content = token.get("content")
 
-                if not msg.strip():
-                    continue
+                    if token_type in ("user_message", "token_usage"):
+                        continue
 
-                await self._process_message(msg)
+                    if sending_prompt:
+                        sending.stop()
+                        sending_prompt = False
 
-        return True
+                    if token_type == "prompt_progress":
+                        if not processing_prompt:
+                            if first_processing_prompt:
+                                first_processing_prompt = False
+                            else:
+                                # create a newline so that the progress bar doesnt replace the content
+                                self.console.print()
 
-    async def on_push(self, message: dict):
-        self.log("push", message.get("content").strip())
-        print(flush=True)
+                            # display a progress bar
+                            progress.start()
+                            progress_task = progress.add_task("[lime]Processing..", total=token_content.get("total"))
+                            processing_prompt = True
 
-    def on_log(self, category, message):
+                        progress.update(progress_task, advance=token_content.get("processed"))
+
+                    if token_type != "formatted":
+                        continue
+
+                    if processing_prompt:
+                        # remove the progress bar upon receival of the first non-progress token
+                        progress.remove_task(progress_task)
+                        progress.stop()
+                        processing_prompt = False
+
+                    self.console.print(token_content, end="")
+            except asyncio.CancelledError:
+                self.console.print("\n[cyan]cancelled.[/]")
+            except KeyboardInterrupt:
+                self.console.print("\n[cyan]cancelled.[/]")
+            finally:
+                progress.stop()
+
+            self.console.print()
+
+    def on_log(self, category: str, message: str):
         if category == "toolcall":
             # SKIP
             return
 
-        if core.quiet:
+        if not hasattr(self, 'console'):
             return
 
-        # allow hiding the category string for special formatting and stuff
-        cat_str = f"[{category.upper()}] " if category else ""
-        print(f"{cat_str}{message}", flush=True)
+        cat_str = rf"\[{category.upper()}] " if category else ""
 
-    def on_shutdown(self):
-        self.running = False
-        return True
+        self.console.print(f"[bold]{cat_str}[/bold]{message}")

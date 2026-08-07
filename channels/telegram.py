@@ -251,6 +251,8 @@ class Telegram(core.channel.Channel):
                 content = token.get("content", "")
                 if not content:
                     continue
+                if not isinstance(content, str):
+                    continue
 
                 async with edit_lock:
                     state.full_content += content
