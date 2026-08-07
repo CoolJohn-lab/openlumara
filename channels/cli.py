@@ -35,6 +35,20 @@ class Cli(core.channel.Channel):
         self.console.print(plaintext("-"*40))
 
         self.console.print(plaintext(f"Welcome to OpenLumara V{core.version}"))
+
+        if core.firstboot:
+            self.console.print("-"*40)
+            self.console.print("[bold]First start detected![/bold]")
+            self.console.print("Welcome to OpenLumara! Here is a quick guide on how to get started:")
+            if "webui" in self.manager.channels:
+                webui_chan = self.manager.channels["webui"]
+                self.console.print(f"1. Open the WebUI at the link indicated below")
+                self.console.print("2. Click the gear icon inside the webUI (in the header above the chat) to open the Settings Panel")
+                self.console.print("3. Navigate to the API tab, then get your API url from your preferred local AI server (such as llamacpp, lemonade, koboldcpp) or your cloud API")
+                self.console.print("4. Verify the connection is good, then navigate to the Models tab and select your model")
+                self.console.print("5. You're done. Enjoy!")
+            self.console.print("-"*40)
+
         self.console.print("Type /new to start a new session, /help for help, /chats to see your chats")
         self.console.print("Type /quit or /exit to quit")
         self.console.print(plaintext("-"*40))

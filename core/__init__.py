@@ -2,6 +2,7 @@ import os
 
 version = 1.0
 
+firstboot = False
 quiet = False
 debug = False
 debug_stream = False
@@ -36,5 +37,12 @@ import core.channel
 
 import core.modules
 import core.api
+
+# handle first boot
+firstboot_path = core.get_data_path("firstboot")
+if not os.path.exists(firstboot_path):
+    firstboot = True
+    with open(firstboot_path, 'w', encoding="utf-8") as f:
+        f.write("")
 
 import core.manager
