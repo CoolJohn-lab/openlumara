@@ -93,10 +93,10 @@ class Cli(core.channel.Channel):
 
                             # display a progress bar
                             progress.start()
-                            progress_task = progress.add_task("[lime]Processing..", total=token_content.get("total"))
+                            progress_task = progress.add_task("[lime]Processing..", total=1)
                             processing_prompt = True
 
-                        progress.update(progress_task, advance=token_content.get("processed"))
+                        progress.update(progress_task, completed=(token_content.get("processed") / token_content.get("total")), refresh=True)
 
                     if token_type != "formatted":
                         continue
