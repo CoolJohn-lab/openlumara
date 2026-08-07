@@ -1,6 +1,7 @@
 import core
 import readline
 import asyncio
+import random
 import concurrent.futures
 
 import rich
@@ -28,6 +29,25 @@ class Cli(core.channel.Channel):
         }
     }
 
+    blurbs = [
+        "making AI agents easy for everyday people since 2026",
+        "the AI framework that puts local AI first",
+        "Rose22's pet project that grew way out of proportion",
+        "because AI agents should be for more than just coding",
+        "because every other agent wastes tokens like no tomorrow",
+        "what are we doing today?",
+        "Rose22 says: i liek stawrbery",
+        "winamp - it really whips the -- oh wait sorry wrong program",
+        "your personal fancy websea---- i mean AI agent",
+        "the \"open\" stands for open source. unlike openAI.",
+        "where local AI is the #1 priority",
+        "you won't find a better deal than this. ..because it's free. and open source.",
+        "your sanctuary in a sea of vibecoded noise",
+        "openclaw wishes it could be this",
+        "fast, lightweight, and modular",
+        "the AI agent that literally can't wreck your computer"
+    ]
+
     dependencies = ["rich"]
 
     async def on_ready(self):
@@ -35,6 +55,8 @@ class Cli(core.channel.Channel):
         self.console.print(plaintext("-"*40))
 
         self.console.print(plaintext(f"Welcome to OpenLumara V{core.version}"))
+        self.console.print(f"[italic]{random.choice(self.blurbs)}[/]")
+        self.console.print()
 
         if core.firstboot:
             self.console.print("-"*40)

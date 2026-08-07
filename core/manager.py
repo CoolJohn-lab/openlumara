@@ -43,7 +43,7 @@ class Manager:
 
     def log(self, category: str, message: str):
         """propagate the output to every channel"""
-        if not self.started:
+        if not self.started and not core.quiet:
             cat_str = rf"[{category.upper()}] " if category else ""
             print(f"{cat_str}{message}")
             return
