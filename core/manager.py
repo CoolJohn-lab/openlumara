@@ -3,6 +3,7 @@ import modules
 import os
 import sys
 import datetime
+import time
 import asyncio
 import json_repair
 import inspect
@@ -152,6 +153,8 @@ class Manager:
     async def run(self):
         """main loop"""
 
+        startup_timestamp = time.time()
+
         should_swallow_exceptions = (not core.debug)
         self._prevent_double_shutdown = False
 
@@ -272,25 +275,34 @@ class Manager:
                 # reload config
                 core.config.load()
 
+        elapsed_timestamp = time.time() - startup_timestamp
+        self.log("core", f"Startup completed in {elapsed_timestamp:.2f}s")
+        self.log("", "-"*40)
+
         # Attempt API connection but don't fail if it doesn't work
-        """Initialize API connection"""
         self.log("API", "Connecting..")
 
         connected = await self.API.connect()
         if isinstance(connected, core.api.APIError):
             self.log("API", str(connected))
 
-        # run everything
-        self.log("core", "Startup complete")
-        self.log("", "-"*40)
-
         # start the channels (execute their .run() method)
         for channel_name, channel in self.channels.items():
+            if channel_name == "cli":
+                # skip so that we can load it as the last one manually at the end
+                continue
+
             self.log("core", f"Starting channel {channel_name}")
 
             await channel.on_ready()
             self._async_tasks.add(asyncio.create_task(channel.run()))
             self._async_tasks.add(asyncio.create_task(channel._start_push_queue()))
+
+        if "cli" in self.channels.keys():
+            cli_chan = self.channels["cli"]
+            await cli_chan.on_ready()
+            self._async_tasks.add(asyncio.create_task(cli_chan.run()))
+            self._async_tasks.add(asyncio.create_task(cli_chan._start_push_queue()))
 
         self.started = True
 
