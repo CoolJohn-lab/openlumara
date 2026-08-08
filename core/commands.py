@@ -87,9 +87,11 @@ class Commands:
         # chat management
         "new": "starts a new session",
         "clear": "clears chat history",
-        "chats": "lists previous chats",
+        "chats": {
+            "<page number>": "show previous chats, paginated",
+        },
         "chat": {
-            "": "load or manage a chat",
+            "": "show details about current chat",
             "<ID>": "loads a chat by its ID",
             "rename <name>": "renames current chat",
             "category <category>": "puts chat in that category",
@@ -278,10 +280,41 @@ class Commands:
         if not chats:
             return "No saved chats found."
         
-        result = f"Saved chats for {self.channel.name}:\n"
-        for conv in reversed(chats[:10]):
+        # Parse page number from first argument
+        page_size = 10
+        page_number = 1
+        
+        if args:
+            try:
+                page_number = int(args[0])
+                if page_number < 1:
+                    page_number = 1
+            except ValueError:
+                pass
+        
+        # Sort chats by updated date (most recent first)
+        sorted_chats = sorted(chats, key=lambda x: x.get('updated', ''), reverse=True)
+        
+        total_chats = len(sorted_chats)
+        total_pages = (total_chats + page_size - 1) // page_size if total_chats > 0 else 1
+        
+        # Calculate page bounds
+        start_idx = (page_number - 1) * page_size
+        end_idx = min(start_idx + page_size, total_chats)
+        
+        if start_idx >= total_chats:
+            page_number = max(1, total_pages)
+            start_idx = (page_number - 1) * page_size
+            end_idx = min(start_idx + page_size, total_chats)
+        
+        # Get chats for this page
+        page_chats = sorted_chats[start_idx:end_idx]
+        
+        result = f"Saved chats for {self.channel.name} (page {page_number}/{total_pages}, showing {start_idx + 1}-{end_idx} of {total_chats}):\n"
+        for conv in page_chats:
             date_str = datetime.datetime.fromisoformat(conv.get('updated')).strftime("%x %X")
             result += f"- [{date_str}] [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
+        
         return result
 
     async def cmd_search(self, args: list):
