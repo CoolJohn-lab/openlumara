@@ -46,6 +46,10 @@ class Cli(core.channel.Channel):
             "description": "Accent color (as hex code) to use for various UI elements",
             "default": "#E0B0FF"
         },
+        "prompt": {
+            "description": "The prompt text you would like to appear when the CLI asks you for input",
+            "default": "user>"
+        },
         "show_status_bar": {
             "description": "Whether to show a bar at the bottom of the CLI, with stuff like current token use, current model, etc",
             "default": True
@@ -194,9 +198,10 @@ class Cli(core.channel.Channel):
                     optional_args["bottom_toolbar"] = self.bottom_bar
 
                 accent_color = self._get_accent_color()
+                prompt_text = self.config.get("prompt")
                 with prompt_toolkit.patch_stdout.patch_stdout(raw=True):
                     user_input = await prompt_session.prompt_async(
-                        prompt_toolkit.formatted_text.HTML(f"<style fg=\"{accent_color}\">user></style> "),
+                        prompt_toolkit.formatted_text.HTML(f"<style fg=\"{accent_color}\">{prompt_text}</style> "),
                         set_exception_handler=False,
                         **optional_args
                     )
@@ -234,7 +239,7 @@ class Cli(core.channel.Channel):
 
             if not show_reasoning:
                 reasoning_indicator = rich.status.Status("Thinking..", console=self.console)
-                reasoning_indicator_started = False
+            reasoning_indicator_started = False
 
             try:
                 async for token in self.format_stream_for_text(
@@ -293,14 +298,21 @@ class Cli(core.channel.Channel):
             finally:
                 progress.stop()
                 sending.stop()
-                reasoning_indicator.stop()
+
+                if not show_reasoning:
+                    reasoning_indicator.stop()
+
                 self._token_usage = await self.context.get_total_tokens()
 
             self.console.print()
 
     async def on_push(self, message: dict):
         accent_color = self._get_accent_color()
-        self.console.print(f"--> [{accent_color}]PUSH:[/] {message.get('content')}")
+        self.console.print("-"*40)
+        self.console.print(f"[{accent_color} bold]{message.get('content')}")
+        self.console.print("-"*40)
+
+        self._token_usage = await self.context.get_total_tokens()
 
     def on_log(self, category: str, message: str):
         if category == "toolcall":

@@ -146,6 +146,7 @@ async function handleWebSocketMessage(data) {
             // handle state based on the current segment
             const current_segment = stream.turn.messages[stream.turn.messages.length - 1];
             const segment_type = current_segment.type;
+            console.log(segment_type);
 
             switch (segment_type) {
                 case "reasoning":
@@ -167,14 +168,6 @@ async function handleWebSocketMessage(data) {
                         AudioManager.play("response_start");
                         responseSoundPlayed = true;
                     }
-                    break;
-                case "tool_calls":
-                    stream.state = 'calling_tools';
-                    stream.processing = {};
-                    break;
-                case "tool":
-                    stream.state = 'processing_tools';
-                    AudioManager.playProcessingSound();
                     break;
             }
 
@@ -223,14 +216,15 @@ async function handleWebSocketMessage(data) {
             token_type = token.type;
             token_content = token.content;
 
-            console.log(token)
-            console.log(stream.state);
-
             // process tokens based on their type
             switch (token_type) {
                 case "error":
                     // force a refresh
                     await chat.reloadChat();
+                    break;
+                case "tool":
+                    stream.state = 'processing_tools';
+                    AudioManager.playProcessingSound();
                     break;
                 case "prompt_progress":
                     if (stream.state != "processing_tools") {
@@ -244,9 +238,6 @@ async function handleWebSocketMessage(data) {
                     break;
                 case "token_usage":
                     chat.currentTokenUsage = token_content;
-                case "tool":
-                    stream.state = 'processing_tools';
-                    AudioManager.playProcessingSound();
                     break;
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
@@ -256,7 +247,6 @@ async function handleWebSocketMessage(data) {
                     stream.state = 'calling_tools';
                     break;
             }
-
 
             // always scroll to the bottom upon a token coming in
             await ui.scrollToBottom();
