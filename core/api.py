@@ -165,7 +165,7 @@ class APIClient():
 
     def set_model(self, name: str):
         core.config.config["model"]["name"] = name
-        core.config.save()
+        core.config.config.save()
 
         return True
 

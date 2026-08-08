@@ -41,7 +41,26 @@ class Cli(core.channel.Channel):
         "stream_tool_calls": {
             "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
             "default": True
-        }
+        },
+        "show_status_bar": {
+            "description": "Whether to show a bar at the bottom of the CLI, with stuff like current token use, current model, etc",
+            "default": True
+        },
+        "show_model_name": {
+            "description": "Whether to show the model name in the bottom bar",
+            "default": True,
+            "depends": "show_status_bar"
+        },
+        "show_token_usage": {
+            "description": "Whether to show the current token usage in the bottom bar",
+            "default": True,
+            "depends": "show_status_bar"
+        },
+        "show_api_url": {
+            "description": "Whether to show the configured API URL in the bottom bar",
+            "default": False,
+            "depends": "show_status_bar"
+        },
     }
 
     blurbs = [
@@ -119,6 +138,9 @@ class Cli(core.channel.Channel):
         return "▓" * filled + "░" * empty
 
     def bottom_bar(self):
+        if not self.config.get("show_status_bar"):
+            return None
+
         model = self.manager.API.get_model() or "model not set"
         max_tokens = core.config.get('api', 'max_context')
         api_url = core.config.get('api', 'url')
@@ -126,7 +148,12 @@ class Cli(core.channel.Channel):
         tokens_percent = self._token_usage / max_tokens
         token_bar = self._token_bar(tokens_percent, width=20)
 
-        return f"⇄ {api_url} | ▣ {model} | ◉ Tokens: {token_bar} {self._token_usage}/{max_tokens}"
+        model_str = f"▣ {model}" if self.config.get("show_model_name") else ""
+        token_bar_str = f"◉ Tokens: {token_bar} {self._token_usage}/{max_tokens}" if self.config.get("show_token_usage") else ""
+        api_url_str = f"⇄ {api_url}" if self.config.get("show_api_url") else ""
+
+        total_bar = [s for s in (model_str, token_bar_str, api_url_str) if s]
+        return " | ".join(total_bar)
 
     async def run(self):
         # auto disable when not run from a terminal
@@ -150,11 +177,15 @@ class Cli(core.channel.Channel):
 
         while True:
             try:
+                optional_args = {}
+                if self.config.get("show_status_bar"):
+                    optional_args["bottom_toolbar"] = self.bottom_bar
+
                 with prompt_toolkit.patch_stdout.patch_stdout(raw=True):
                     user_input = await prompt_session.prompt_async(
                         prompt_toolkit.formatted_text.HTML("<ansicyan>user></ansicyan> "),
                         set_exception_handler=False,
-                        bottom_toolbar=self.bottom_bar
+                        **optional_args
                     )
             except (KeyboardInterrupt, EOFError):
                 self.console.print()
@@ -184,6 +215,10 @@ class Cli(core.channel.Channel):
                 ):
                     token_type = token.get("type")
                     token_content = token.get("content")
+
+                    if token_type == "error":
+                        self.console.print("[red][bold]ERROR:[/bold] {token_content}[/red]")
+                        continue
 
                     if token_type in ("user_message", "token_usage"):
                         continue
