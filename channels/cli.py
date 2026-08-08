@@ -132,8 +132,10 @@ class Cli(core.channel.Channel):
                 self.console.print("5. You're done. Enjoy!")
             self.console.print("-"*40)
 
-        self.console.print("Type /new to start a new session, /help for help, /chats to see your chats")
-        self.console.print("Type /quit or /exit to quit")
+        cmd_prefix = core.config.get("core", "cmd_prefix")
+
+        self.console.print(f"Type {cmd_prefix}new to start a new session, {cmd_prefix}help for help, {cmd_prefix}chats to see your chats")
+        self.console.print(f"Type {cmd_prefix}quit or {cmd_prefix}exit to quit")
         self.console.print(plaintext("-"*40))
 
         # install rich's traceback handler
@@ -262,7 +264,7 @@ class Cli(core.channel.Channel):
                     token_content = token.get("content")
 
                     if token_type == "error":
-                        self.console.print("[red][bold]ERROR:[/bold] {token_content}[/red]")
+                        self.console.print(f"[red][bold]ERROR:[/bold] {token_content}[/red]")
                         continue
                     elif token_type in ("user_message", "token_usage"):
                         continue

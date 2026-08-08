@@ -4,10 +4,6 @@ import datetime
 import json
 import shlex
 
-
-CMD_PREFIX = core.config.get("core").get("cmd_prefix", "/")
-
-
 def _convert_type(value: str):
     """
     Converts string inputs from the CLI/Chat into appropriate Python types.
@@ -33,21 +29,22 @@ def _convert_type(value: str):
     # Default to string
     return value
 
-
 def get_commands(modules_dict: dict = None):
     """
     Return all available commands as a list of dicts (key=command, value=description)
     """
     commands = {"core": {}}
+    cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
 
-    # add core commands (built into Commands class)
-    for attr_name in dir(Commands):
-        if attr_name.startswith("cmd_"):
-            method = getattr(Commands, attr_name)
-            desc = getattr(method, "__doc__", None) or attr_name.replace("cmd_", "")
-            desc = desc.strip().split('\n')[0]  # first line only
-            cmd_name = attr_name.replace("cmd_", "")
-            commands["core"][f"{CMD_PREFIX}{cmd_name}"] = desc
+    # add core commands (built into Commands class) using CMD_DEFS
+    for cmd_name, desc in Commands.CMD_DEFS.items():
+        if isinstance(desc, dict):
+            # subcommands - expand each one
+            for subcmd, subdesc in desc.items():
+                full_cmd = f"{cmd_name} {subcmd}".strip()
+                commands["core"][f"{cmd_prefix}{full_cmd}"] = subdesc
+        else:
+            commands["core"][f"{cmd_prefix}{cmd_name}"] = desc
 
     if modules_dict:
         for module_name, instance in modules_dict.items():
@@ -63,9 +60,9 @@ def get_commands(modules_dict: dict = None):
                         if isinstance(desc, dict):
                             for subcmd, subdesc in desc.items():
                                 full_cmd = f"{cmd_name} {subcmd}".strip()
-                                module_cmds[f"{CMD_PREFIX}{full_cmd}"] = subdesc
+                                module_cmds[f"{cmd_prefix}{full_cmd}"] = subdesc
                         else:
-                            module_cmds[f"{CMD_PREFIX}{cmd_name}"] = desc
+                            module_cmds[f"{cmd_prefix}{cmd_name}"] = desc
 
             # If this module has any commands, add them to the output
             if module_cmds and module_name:
@@ -80,6 +77,46 @@ class Commands:
     # delete these after they are shown to the user once
     GHOST = ("help", "new", "clear", "context", "prompt", "tools")
     PUBLIC_COMMANDS = ("new", "clear", "status", "stop")
+    
+    # command definitions - maps command name to help text
+    # use string for single command, dict for subcommands
+    CMD_DEFS = {
+        "new": "starts a new session",
+        "clear": "clears chat history",
+        "stop": "stops the AI in it's tracks",
+        "chats": "lists previous chats",
+        "search": "searches within your previous chats",
+        "chat": {
+            "": "load or manage a chat",
+            "<ID>": "loads a chat by its ID",
+            "rename <name>": "renames current chat",
+            "category <category>": "puts chat in that category",
+        },
+        "compress": "compresses your chat history",
+        "export": "exports the current chat history to a file",
+        "prompt": {
+            "": "shows system prompt",
+            "<module name>": "shows the system prompt for that module",
+        },
+        "prompts": "shows which prompts are active",
+        "context": "shows full context being sent to AI",
+        "history": "shows full chat history",
+        "status": "shows status info",
+        "restart": "restarts the server",
+        "connect": "attempts to connect to the API",
+        "reconnect": "reconnects to the API",
+        "disconnect": "disconnects from the API",
+        "modules": "lists modules",
+        "tools": "lists tools available to the AI",
+        "module": "enables/disables a module by name",
+        "channel": "toggles a channel",
+        "config": "explore, view, and set config settings",
+        "ping": "test command that echoes Pong!",
+        "help": "shows this help",
+    }
+    
+    # ordered list of core commands for help display
+    COMMAND_ORDER = list(CMD_DEFS.keys())
 
     def __init__(self, channel):
         self.channel = channel
@@ -185,20 +222,22 @@ class Commands:
 
     async def cmd_help(self, args: list):
         """show help"""
+        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
+
         output = []
         cmd_help = core.commands.get_commands(self.channel.manager.modules)
         if cmd_help:
             if args:
                 module_name = args[0]
                 if module_name not in cmd_help.keys():
-                    return "that's not a valid topic! check /help"
+                    return f"that's not a valid topic! check {cmd_prefix}help"
                 
                 for command, desc in cmd_help[module_name].items():
                     output.append(f"{command:<30} {desc}")
                 return "\n".join(output)
             else:
                 topics = "\n".join([f"- {topic}" for topic in cmd_help.keys()])
-                return f"use /help with one of the following topics:\n{topics}\n\nexample: /help core"
+                return f"use {cmd_prefix}help with one of the following topics:\n{topics}\n\nexample: {cmd_prefix}help core"
         return "\n".join(output)
     
     async def cmd_ping(self, args: list):
@@ -226,6 +265,20 @@ class Commands:
             date_str = datetime.datetime.fromisoformat(conv.get('updated')).strftime("%x %X")
             result += f"- [{date_str}] [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
         return result
+
+    async def cmd_search(self, args: list):
+        """Searches within your chat history"""
+        query = " ".join(args)
+        found = await self.channel.context.chat.search(query, 20)
+        if not found:
+            return "no results found"
+
+        output = "" if not found else f"Found these chats containing '{query}':\n\n"
+        for chat in found:
+            date_str = datetime.datetime.fromisoformat(chat.get('updated')).strftime("%x %X")
+            output += f"[{date_str}] [{chat.get('id')}] {chat.get('title')}\n"
+
+        return output
     
     async def cmd_chat(self, args: list):
         """load or manage a chat"""
@@ -261,6 +314,24 @@ class Commands:
                     return "failed to load chat"
                 return "chat loaded"
     
+    async def cmd_compress(self):
+        await self.channel.push("Compressing your chat history..")
+        context = await self.channel.context.get()
+
+        # use API.send() to skip all the usual convenience logic
+        response = await self.channel.anager.API.send(context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}], use_tools=False, use_thinking=False)
+
+        if not response:
+            return None
+
+        # add special cutoff message that gets handled by the context manager
+        await self.channel.context.chat.messages.add(self.manager.channel.context.SUMMARIZATION_CUTOFF)
+
+        # add AI's summarization
+        await self.channel.context.chat.messages.add({"role": "assistant", "content": response.get("content")})
+
+        return True
+
     async def cmd_connect(self, args: list):
         if self.channel.manager.API.connected:
             return "Already connected."
@@ -356,7 +427,7 @@ class Commands:
         return "\n\n".join(tool_map_display)
     
     async def cmd_config(self, args: list):
-        """Explore, view, and set config settings"""
+        """explore, view, and set config settings"""
         def _convert_type(value: str):
             if value.lower() in ["true", "on"]:
                 return True
