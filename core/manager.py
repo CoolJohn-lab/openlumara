@@ -50,7 +50,7 @@ class Manager:
             "cli" not in self.channels.keys()
         ) and not core.quiet:
             cat_str = rf"[{category.upper()}] " if category else ""
-            print(f"{cat_str}{message}")
+            print(f"{cat_str}{message}", flush=True)
             return
 
         for name, channel in self.channels.items():
@@ -90,8 +90,13 @@ class Manager:
         channels_to_load = list(core.modules.load(channels, core.channel.Channel, filter=enabled_channels, reload=True))
 
         for channel in channels_to_load:
-            # add an instance of the channel's class to self.channels
             channel_name = core.modules.get_name(channel)
+
+            # skip loading the CLI channel if we don't have a terminal to output to
+            if channel_name == "cli" and not sys.stdout.isatty():
+                continue
+
+            # add an instance of the channel's class to self.channels
             try:
                 new_chan = channel(self, is_user_channel=is_user_channels)
                 await new_chan.init()
@@ -179,6 +184,10 @@ class Manager:
             enabled_channels = ["cli"]
             enabled_user_channels = []
 
+        if (not enabled_channels and not enabled_user_channels):
+            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
+            exit(1)
+
         # retrieve enabled modules from config
         enabled_modules = core.config.get("modules", "enabled", [])
         enabled_user_modules = core.config.get("user_modules", "enabled", [])
@@ -190,10 +199,6 @@ class Manager:
         elif self.coding_mode:
             enabled_modules = ["coder"]
             enabled_user_modules = []
-
-        if not enabled_channels:
-            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
-            exit(1)
 
         import channels
         import modules
@@ -302,6 +307,8 @@ class Manager:
             self._async_tasks.add(asyncio.create_task(channel.run()))
             self._async_tasks.add(asyncio.create_task(channel._start_push_queue()))
 
+        # _load_channels() automatically detects if we're in a TTY or not, so if not,
+        # cli is not in the channels dict and this will be skipped
         if "cli" in self.channels.keys():
             self.log("core", f"Starting channel: CLI")
 
