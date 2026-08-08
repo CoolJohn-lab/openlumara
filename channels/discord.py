@@ -59,6 +59,9 @@ class Client(discord.Client):
                             state.full_content = ""
                         continue
 
+                    if token.get("type") != "formatted":
+                        continue
+
                     word = token.get("content")
                     if not word or not isinstance(word, str):
                         continue

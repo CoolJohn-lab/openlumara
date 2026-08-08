@@ -248,6 +248,9 @@ class Telegram(core.channel.Channel):
                         state.full_content = ""
                     continue
 
+                if token.get("type") != "formatted":
+                    continue
+
                 content = token.get("content", "")
                 if not content:
                     continue
