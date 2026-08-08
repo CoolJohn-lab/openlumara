@@ -1,4 +1,4 @@
-import core
+import sys
 import readline
 import asyncio
 import random
@@ -12,40 +12,61 @@ import rich.progress
 import rich.markdown
 import rich.traceback
 
+import core
+
 def plaintext(text):
     """helper that makes the Rich library not auto-color text"""
 
     return rich.text.Text(text)
 
 class Cli(core.channel.Channel):
+    """A basic CLI channel for openlumara"""
+
     settings = {
         "show_reasoning": {
             "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
-            "default": False
+            "default": True
         },
         "stream_tool_calls": {
             "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
-            "default": False
+            "default": True
         }
     }
 
     blurbs = [
         "making AI agents easy for everyday people since 2026",
         "the AI framework that puts local AI first",
-        "Rose22's pet project that grew way out of proportion",
         "because AI agents should be for more than just coding",
-        "because every other agent wastes tokens like no tomorrow",
         "what are we doing today?",
         "Rose22 says: i liek stawrbery",
+        "Rose22 says: remember to drink water!",
         "winamp - it really whips the -- oh wait sorry wrong program",
-        "your personal fancy websea---- i mean AI agent",
-        "the \"open\" stands for open source. unlike openAI.",
+        "your personal fancy websea--- i mean AI agent",
+        "the \"open\" stands for open source.",
         "where local AI is the #1 priority",
-        "you won't find a better deal than this. ..because it's free. and open source.",
         "your sanctuary in a sea of vibecoded noise",
-        "openclaw wishes it could be this",
+        "cats have claws too, not just lobsters. meow! :3",
         "fast, lightweight, and modular",
-        "the AI agent that literally can't wreck your computer"
+        "the AI agent that literally can't wreck your computer",
+        "remember to hydrate!",
+        "em dashes are annoying — don't be an em dash.",
+        "hey lumaraGPT write me an essay about lumaraGPT",
+        "WAIT NO OPENCLAW STOP DONT DELETE MY EMAILS",
+        "press A to jump",
+        "press B to crouch",
+        "press START to play",
+        "press R1 to grab onto a surface",
+        "insert theme song here",
+        "initializing artificial intelligence",
+        "this is where our slogan would be if we were a company. but we're not!",
+        "now you're thinking with portals",
+        "uwu",
+        ":3",
+        "pairs well with Qwen or Gemma!",
+        "because the average person doesn't have datacenter amounts of VRAM",
+        "fully local, fully private",
+        "your data stays where it belongs - on your hardware",
+        "fully open source, fully local, fully private"
     ]
 
     dependencies = ["rich"]
@@ -54,7 +75,7 @@ class Cli(core.channel.Channel):
         self.console = rich.console.Console()
         self.console.print(plaintext("-"*40))
 
-        self.console.print(plaintext(f"Welcome to OpenLumara V{core.version}"))
+        self.console.print(f"[bold cyan]Welcome to OpenLumara[/]")
         self.console.print(f"[italic]{random.choice(self.blurbs)}[/]")
         self.console.print()
 
@@ -83,6 +104,10 @@ class Cli(core.channel.Channel):
         return await loop.run_in_executor(None, input, "user> ")
 
     async def run(self):
+        # auto disable when not run from a terminal
+        if not sys.stdin.isatty():
+            return False
+
         while True:
             try:
                 user_input = await self._get_input()
@@ -90,6 +115,9 @@ class Cli(core.channel.Channel):
                 self.console.print()
                 await self.manager.shutdown()
                 break
+
+            if not user_input:
+                continue
 
             _, cmd, _ = await self.commands._extract_cmd(user_input)
             if cmd in ("quit", "exit"):
@@ -152,6 +180,9 @@ class Cli(core.channel.Channel):
                 progress.stop()
 
             self.console.print()
+
+    async def on_push(self, message: dict):
+        self.console.print(f"--> [cyan]PUSH:[/] {message.get('content')}")
 
     def on_log(self, category: str, message: str):
         if category == "toolcall":
