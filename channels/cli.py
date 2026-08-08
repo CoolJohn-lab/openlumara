@@ -1,9 +1,19 @@
+import os
 import sys
 import readline
 import asyncio
 import random
 import concurrent.futures
 
+# prompt toolkit for better input, async prompting, command history, and so on
+import prompt_toolkit
+import prompt_toolkit.patch_stdout
+import prompt_toolkit.history
+import prompt_toolkit.formatted_text
+import prompt_toolkit.styles
+import prompt_toolkit.auto_suggest
+
+# rich for pretty output and progress indicators
 import rich
 import rich.console
 import rich.text
@@ -12,6 +22,7 @@ import rich.progress
 import rich.markdown
 import rich.traceback
 
+# openlumara core
 import core
 
 def plaintext(text):
@@ -61,7 +72,7 @@ class Cli(core.channel.Channel):
         "fully open source, fully local, fully private"
     ]
 
-    dependencies = ["rich"]
+    dependencies = ["prompt_toolkit", "rich"]
 
     async def on_ready(self):
         self.console = rich.console.Console()
@@ -91,18 +102,60 @@ class Cli(core.channel.Channel):
         # install rich's traceback handler
         rich.traceback.install(show_locals=True)
 
+        self._token_usage = await self.context.get_total_tokens()
+
     async def _get_input(self):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, input, "user> ")
+
+    def _setup_history(self):
+        history_file = os.path.join(core.get_data_path(), "cli_history")
+        self.history = prompt_toolkit.history.FileHistory(str(history_file))
+
+    def _token_bar(self, pct, width=10):
+        pct = max(0, min(1, pct))  # clamp 0-1
+        filled = int(pct * width)
+        empty = width - filled
+        return "█" * filled + "░" * empty
+
+    def bottom_bar(self):
+        model = self.manager.API.get_model()
+        max_tokens = core.config.get('api', 'max_context')
+        api_url = core.config.get('api', 'url')
+
+        tokens_percent = self._token_usage / max_tokens
+        token_bar = self._token_bar(tokens_percent)
+
+        return f"⇄ {api_url} | ▣ {model} | ◉ Tokens: {token_bar} {self._token_usage}/{max_tokens}"
 
     async def run(self):
         # auto disable when not run from a terminal
         if not sys.stdin.isatty():
             return False
 
+        self._setup_history()
+
+        prompt_session = prompt_toolkit.PromptSession(
+            history=self.history,
+            multiline=False,
+            mouse_support=False,
+            enable_system_prompt=True,
+            enable_suspend=True,
+            search_ignore_case=True,
+            auto_suggest=prompt_toolkit.auto_suggest.AutoSuggestFromHistory(),
+            style=prompt_toolkit.styles.Style.from_dict({
+                "bottom-toolbar": "#0A0A0A bg:#777777"
+            })
+        )
+
         while True:
             try:
-                user_input = await self._get_input()
+                with prompt_toolkit.patch_stdout.patch_stdout(raw=True):
+                    user_input = await prompt_session.prompt_async(
+                        prompt_toolkit.formatted_text.HTML("<ansicyan>user></ansicyan> "),
+                        set_exception_handler=False,
+                        bottom_toolbar=self.bottom_bar
+                    )
             except (KeyboardInterrupt, EOFError):
                 self.console.print()
                 await self.manager.shutdown()
@@ -170,6 +223,7 @@ class Cli(core.channel.Channel):
                 self.console.print("\n[cyan]cancelled.[/]")
             finally:
                 progress.stop()
+                self._token_usage = await self.context.get_total_tokens()
 
             self.console.print()
 
