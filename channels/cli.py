@@ -82,7 +82,7 @@ class Cli(core.channel.Channel):
         self.console.print(f"[italic]{random.choice(self.blurbs)}[/]")
         self.console.print()
 
-        if core.firstboot:
+        if core.firstrun:
             self.console.print("-"*40)
             self.console.print("[bold]First start detected![/bold]")
             self.console.print("Welcome to OpenLumara! Here is a quick guide on how to get started:")
@@ -116,7 +116,7 @@ class Cli(core.channel.Channel):
         pct = max(0, min(1, pct))  # clamp 0-1
         filled = int(pct * width)
         empty = width - filled
-        return "█" * filled + "░" * empty
+        return "▓" * filled + "░" * empty
 
     def bottom_bar(self):
         model = self.manager.API.get_model() or "model not set"
@@ -124,7 +124,7 @@ class Cli(core.channel.Channel):
         api_url = core.config.get('api', 'url')
 
         tokens_percent = self._token_usage / max_tokens
-        token_bar = self._token_bar(tokens_percent)
+        token_bar = self._token_bar(tokens_percent, width=20)
 
         return f"⇄ {api_url} | ▣ {model} | ◉ Tokens: {token_bar} {self._token_usage}/{max_tokens}"
 
