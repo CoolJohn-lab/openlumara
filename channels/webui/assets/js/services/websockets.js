@@ -223,6 +223,9 @@ async function handleWebSocketMessage(data) {
             token_type = token.type;
             token_content = token.content;
 
+            console.log(token)
+            console.log(stream.state);
+
             // process tokens based on their type
             switch (token_type) {
                 case "error":
@@ -241,6 +244,10 @@ async function handleWebSocketMessage(data) {
                     break;
                 case "token_usage":
                     chat.currentTokenUsage = token_content;
+                case "tool":
+                    stream.state = 'processing_tools';
+                    AudioManager.playProcessingSound();
+                    break;
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
                     stream.processing = {};
@@ -248,11 +255,8 @@ async function handleWebSocketMessage(data) {
                 case "tool_calls":
                     stream.state = 'calling_tools';
                     break;
-                case "tool":
-                    stream.state = 'processing_tools';
-                    AudioManager.playProcessingSound();
-                    break;
             }
+
 
             // always scroll to the bottom upon a token coming in
             await ui.scrollToBottom();

@@ -710,7 +710,7 @@ class Channel:
         assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
         await self._send_postprocess(assistant_message)
 
-    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None):
+    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None, show_indicators=True):
         """
         Formats a stream of turn segments into text deltas for text-based channels.
         """
@@ -767,7 +767,8 @@ class Channel:
                 if first_turn:
                     first_turn = False
                 else:
-                    yield text_to_token("\n"+strings["separator"]+"\n")
+                    if strings.get("separator"):
+                        yield text_to_token("\n"+strings["separator"]+"\n")
 
                 last_content = {}
                 
@@ -794,7 +795,8 @@ class Channel:
                         last_content = {}
                     last_content["reasoning"] = current
                 elif not shown_reasoning_indicator:
-                    yield text_to_token("thinking..")
+                    if show_indicators:
+                        yield text_to_token("thinking..")
                     shown_reasoning_indicator = True
 
             elif segment_type == "content":

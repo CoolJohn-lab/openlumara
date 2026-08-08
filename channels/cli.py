@@ -36,11 +36,15 @@ class Cli(core.channel.Channel):
     settings = {
         "show_reasoning": {
             "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
-            "default": True
+            "default": False
         },
         "stream_tool_calls": {
             "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
             "default": True
+        },
+        "accent_color": {
+            "description": "Accent color (as hex code) to use for various UI elements",
+            "default": "#E0B0FF"
         },
         "show_status_bar": {
             "description": "Whether to show a bar at the bottom of the CLI, with stuff like current token use, current model, etc",
@@ -94,10 +98,12 @@ class Cli(core.channel.Channel):
     dependencies = ["prompt_toolkit", "rich"]
 
     async def on_ready(self):
+        accent_color = self.config.get("accent_color") or "white"
+
         self.console = rich.console.Console()
         self.console.print(plaintext("-"*40))
 
-        self.console.print(f"[bold cyan]Welcome to OpenLumara[/]")
+        self.console.print(f"[{accent_color}]Welcome to OpenLumara[/]")
         self.console.print(f"[italic]{random.choice(self.blurbs)}[/]")
         self.console.print()
 
@@ -127,6 +133,9 @@ class Cli(core.channel.Channel):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, input, "user> ")
 
+    def _get_accent_color(self):
+        return self.config.get("accent_color") or "white"
+
     def _setup_history(self):
         history_file = os.path.join(core.get_data_path(), "cli_history")
         self.history = prompt_toolkit.history.FileHistory(str(history_file))
@@ -135,7 +144,9 @@ class Cli(core.channel.Channel):
         pct = max(0, min(1, pct))  # clamp 0-1
         filled = int(pct * width)
         empty = width - filled
-        return "▓" * filled + "░" * empty
+
+        accent_color = self._get_accent_color()
+        return f"<style bg=\"{accent_color}\">" + ("▓" * filled) + "</style>" + ("░" * empty)
 
     def bottom_bar(self):
         if not self.config.get("show_status_bar"):
@@ -153,7 +164,8 @@ class Cli(core.channel.Channel):
         api_url_str = f"⇄ {api_url}" if self.config.get("show_api_url") else ""
 
         total_bar = [s for s in (model_str, token_bar_str, api_url_str) if s]
-        return " | ".join(total_bar)
+        total_bar_str = " | ".join(total_bar)
+        return prompt_toolkit.formatted_text.HTML(total_bar_str)
 
     async def run(self):
         # auto disable when not run from a terminal
@@ -181,9 +193,10 @@ class Cli(core.channel.Channel):
                 if self.config.get("show_status_bar"):
                     optional_args["bottom_toolbar"] = self.bottom_bar
 
+                accent_color = self._get_accent_color()
                 with prompt_toolkit.patch_stdout.patch_stdout(raw=True):
                     user_input = await prompt_session.prompt_async(
-                        prompt_toolkit.formatted_text.HTML("<ansicyan>user></ansicyan> "),
+                        prompt_toolkit.formatted_text.HTML(f"<style fg=\"{accent_color}\">user></style> "),
                         set_exception_handler=False,
                         **optional_args
                     )
@@ -208,10 +221,27 @@ class Cli(core.channel.Channel):
             sending_prompt = True
             sending = rich.status.Status("Sending", console=self.console)
             sending.start()
+
+            show_reasoning = self.config.get("show_reasoning")
+
+            strings = {
+                "thinking_header": "Thinking:",
+                "thinking_newline": "\n-> ",
+                "conclusion_header": "",
+                "separator": "-"*8 if show_reasoning else "",
+                "tool_call_header": "🔧 calling tool {tool_name}"
+            }
+
+            if not show_reasoning:
+                reasoning_indicator = rich.status.Status("Thinking..", console=self.console)
+                reasoning_indicator_started = False
+
             try:
                 async for token in self.format_stream_for_text(
                     self.send_stream(user_input, commands_authorized=True),
-                    use_markdown=False
+                    use_markdown=False,
+                    strings=strings,
+                    show_indicators=False
                 ):
                     token_type = token.get("type")
                     token_content = token.get("content")
@@ -219,8 +249,7 @@ class Cli(core.channel.Channel):
                     if token_type == "error":
                         self.console.print("[red][bold]ERROR:[/bold] {token_content}[/red]")
                         continue
-
-                    if token_type in ("user_message", "token_usage"):
+                    elif token_type in ("user_message", "token_usage"):
                         continue
 
                     if sending_prompt:
@@ -237,33 +266,41 @@ class Cli(core.channel.Channel):
 
                             # display a progress bar
                             progress.start()
-                            progress_task = progress.add_task("[lime]Processing..", total=1)
+                            progress_task = progress.add_task(f"[{accent_color}]Processing..", total=1)
                             processing_prompt = True
 
                         progress.update(progress_task, completed=(token_content.get("processed") / token_content.get("total")), refresh=True)
-
-                    if token_type != "formatted":
-                        continue
-
-                    if processing_prompt:
+                    elif processing_prompt:
                         # remove the progress bar upon receival of the first non-progress token
                         progress.remove_task(progress_task)
                         progress.stop()
                         processing_prompt = False
 
-                    self.console.print(token_content, end="")
+                    if token_type == "reasoning" and not show_reasoning:
+                        if not reasoning_indicator_started:
+                            reasoning_indicator.start()
+                            reasoning_indicator_started = True
+                    elif token_type == "formatted":
+                        if reasoning_indicator_started:
+                            reasoning_indicator.stop()
+                            reasoning_indicator_started = False
+
+                        self.console.print(token_content, end="")
             except asyncio.CancelledError:
-                self.console.print("\n[cyan]cancelled.[/]")
+                self.console.print(f"\n[{accent_color}]cancelled.[/]")
             except KeyboardInterrupt:
-                self.console.print("\n[cyan]cancelled.[/]")
+                self.console.print(f"\n[{accent_color}]cancelled.[/]")
             finally:
                 progress.stop()
+                sending.stop()
+                reasoning_indicator.stop()
                 self._token_usage = await self.context.get_total_tokens()
 
             self.console.print()
 
     async def on_push(self, message: dict):
-        self.console.print(f"--> [cyan]PUSH:[/] {message.get('content')}")
+        accent_color = self._get_accent_color()
+        self.console.print(f"--> [{accent_color}]PUSH:[/] {message.get('content')}")
 
     def on_log(self, category: str, message: str):
         if category == "toolcall":
@@ -275,4 +312,5 @@ class Cli(core.channel.Channel):
 
         cat_str = rf"\[{category.upper()}] " if category else ""
 
-        self.console.print(f"[bold]{cat_str}[/bold]{message}")
+        accent_color = self._get_accent_color()
+        self.console.print(f"[bold {accent_color}]{cat_str}[/]{message}")
