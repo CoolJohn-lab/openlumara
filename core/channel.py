@@ -746,6 +746,15 @@ class Channel:
         last_tool_state = {}
         last_content = {}
         
+        # track characters for chunk boundaries
+        char_counter = 0
+        
+        async def check_chunk_boundary():
+            nonlocal char_counter
+            if chunk_size and char_counter >= chunk_size:
+                yield {"type": "new_chunk", "content": ""}
+                char_counter = 0
+
         async for token in self.group_stream(stream):
             # always yield the raw token for manual processing by the channel
             if token.get("type") == "token":
@@ -768,18 +777,34 @@ class Channel:
                     first_turn = False
                 else:
                     if strings.get("separator"):
+                        # create a new chunk if needed
+                        async for _ in check_chunk_boundary():
+                            yield _
                         yield text_to_token("\n"+strings["separator"]+"\n")
+                        char_counter += len("\n"+strings["separator"]+"\n")
 
                 last_content = {}
                 
                 if segment_type == "reasoning" and show_reasoning:
                     currently_reasoning = True
+                    # create a new chunk if needed
+                    async for _ in check_chunk_boundary():
+                        yield _
+
                     yield text_to_token(strings["thinking_header"])
+                    char_counter += len(strings["thinking_header"])
                     yield text_to_token(strings["thinking_newline"])
+                    char_counter += len(strings["thinking_newline"])
                 elif segment_type == "content" and currently_reasoning:
                     currently_reasoning = False
+                    # create a new chunk if needed
+                    async for _ in check_chunk_boundary():
+                        yield _
+
                     yield text_to_token(strings["conclusion_header"])
+                    char_counter += len(strings["conclusion_header"])
                     yield text_to_token("\n")
+                    char_counter += len("\n")
                 elif segment_type == "tool_calls":
                     # Will be handled per-tool below
                     pass
@@ -789,14 +814,24 @@ class Channel:
                     current = segment.get("reasoning_content") or ""
                     delta = current[len(last_content.get("reasoning", "")):]
                     if delta:
+                        # create a new chunk if needed
+                        async for _ in check_chunk_boundary():
+                            yield _
+
                         delta = delta.replace("\n", strings["thinking_newline"])
                         yield text_to_token(delta)
+                        char_counter += len(delta)
                     if "last_content" not in dir():
                         last_content = {}
                     last_content["reasoning"] = current
                 elif not shown_reasoning_indicator:
                     if show_indicators:
+                        # create a new chunk if needed
+                        async for _ in check_chunk_boundary():
+                            yield _
+
                         yield text_to_token("thinking..")
+                        char_counter += len("thinking..")
                     shown_reasoning_indicator = True
 
             elif segment_type == "content":
@@ -810,7 +845,11 @@ class Channel:
 
                 delta = current[content_index:]
                 if delta:
+                    # create a new chunk if needed
+                    async for _ in check_chunk_boundary():
+                        yield _
                     yield text_to_token(delta)
+                    char_counter += len(delta)
                 if "last_content" not in dir():
                     last_content = {}
                 last_content["content"] = current
@@ -833,8 +872,13 @@ class Channel:
                     if prev_name != tool_name:
                         # New tool or name changed - print header
                         header = strings["tool_call_header"].format(tool_name=tool_name)
+                        # create a new chunk if needed
+                        async for _ in check_chunk_boundary():
+                            yield _
                         yield text_to_token("\n")
+                        char_counter += len("\n")
                         yield text_to_token(header)
+                        char_counter += len(header)
                     
                     # Parse the current arguments as partial JSON
                     try:
@@ -856,10 +900,18 @@ class Channel:
                         if prev_val is None:
                             # New key - print the whole key: value
                             val_str = json.dumps(current_val) if isinstance(current_val, (dict, list)) else str(current_val)
+                            # create a new chunk if needed
+                            async for _ in check_chunk_boundary():
+                                yield _
+
                             yield text_to_token("\n")
+                            char_counter += len("\n")
                             yield text_to_token(f"**{key}**: ")
+                            char_counter += len(f"**{key}**: ")
                             yield text_to_token(val_str)
+                            char_counter += len(val_str)
                             yield text_to_token("\n")
+                            char_counter += len("\n")
                         elif current_val is None:
                             # Key removed (shouldn't happen during streaming but handle it)
                             pass
@@ -875,7 +927,11 @@ class Channel:
                                 else:
                                     delta = current_val_str
                                 if delta:
+                                    # create a new chunk if needed
+                                    async for _ in check_chunk_boundary():
+                                        yield _
                                     yield text_to_token(delta)
+                                    char_counter += len(delta)
                     
                     # Update state
                     last_tool_state[tc_id] = {
