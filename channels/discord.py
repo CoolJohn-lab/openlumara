@@ -141,7 +141,7 @@ class Client(discord.Client):
                             # so that it's much more secure
                             content = f"{cmd_prefix}{cmd}"
                             if args:
-                                content += ' '.join(args)}
+                                content += ' '.join(args)
                         else:
                             orig_content = str(content)
                             content = ""
