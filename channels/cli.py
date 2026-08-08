@@ -102,6 +102,9 @@ class Cli(core.channel.Channel):
     dependencies = ["prompt_toolkit", "rich"]
 
     async def on_ready(self):
+        if not sys.stdout.isatty():
+            return
+
         accent_color = self.config.get("accent_color") or "white"
 
         self.console = rich.console.Console()
@@ -173,7 +176,7 @@ class Cli(core.channel.Channel):
 
     async def run(self):
         # auto disable when not run from a terminal
-        if not sys.stdin.isatty():
+        if not sys.stdout.isatty():
             return False
 
         self._setup_history()
