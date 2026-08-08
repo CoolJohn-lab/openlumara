@@ -38,7 +38,10 @@ def get_commands(modules_dict: dict = None):
 
     # add core commands (built into Commands class) using CMD_DEFS
     for cmd_name, desc in Commands.CMD_DEFS.items():
-        if isinstance(desc, dict):
+        if desc is None:
+            # spacer - insert blank line
+            commands["core"][""] = ""
+        elif isinstance(desc, dict):
             # subcommands - expand each one
             for subcmd, subdesc in desc.items():
                 full_cmd = f"{cmd_name} {subcmd}".strip()
@@ -79,21 +82,23 @@ class Commands:
     PUBLIC_COMMANDS = ("new", "clear", "status", "stop")
     
     # command definitions - maps command name to help text
-    # use string for single command, dict for subcommands
+    # use string for single command, dict for subcommands, "__SPACER__" for spacers
     CMD_DEFS = {
+        # chat management
         "new": "starts a new session",
         "clear": "clears chat history",
-        "stop": "stops the AI in it's tracks",
         "chats": "lists previous chats",
-        "search": "searches within your previous chats",
         "chat": {
             "": "load or manage a chat",
             "<ID>": "loads a chat by its ID",
             "rename <name>": "renames current chat",
             "category <category>": "puts chat in that category",
         },
+        "search": "searches within your previous chats",
         "compress": "compresses your chat history",
         "export": "exports the current chat history to a file",
+        "__SPACER__1": "",
+        # info & content
         "prompt": {
             "": "shows system prompt",
             "<module name>": "shows the system prompt for that module",
@@ -102,15 +107,24 @@ class Commands:
         "context": "shows full context being sent to AI",
         "history": "shows full chat history",
         "status": "shows status info",
-        "restart": "restarts the server",
+        "__SPACER__2": "",
+        # API connection
         "connect": "attempts to connect to the API",
         "reconnect": "reconnects to the API",
         "disconnect": "disconnects from the API",
+        "__SPACER__3": "",
+        # module/channel management
         "modules": "lists modules",
-        "tools": "lists tools available to the AI",
         "module": "enables/disables a module by name",
         "channel": "toggles a channel",
+        "tools": "lists tools available to the AI",
+        "__SPACER__4": "",
+        # system
         "config": "explore, view, and set config settings",
+        "restart": "restarts the server",
+        "stop": "stops the AI in it's tracks",
+        "__SPACER__5": "",
+        # utilities
         "ping": "test command that echoes Pong!",
         "help": "shows this help",
     }
@@ -233,7 +247,11 @@ class Commands:
                     return f"that's not a valid topic! check {cmd_prefix}help"
                 
                 for command, desc in cmd_help[module_name].items():
-                    output.append(f"{command:<30} {desc}")
+                    if desc == "":
+                        # spacer - just add a blank line
+                        output.append("")
+                    else:
+                        output.append(f"{command:<30} {desc}")
                 return "\n".join(output)
             else:
                 topics = "\n".join([f"- {topic}" for topic in cmd_help.keys()])
