@@ -44,7 +44,11 @@ class Manager:
 
     def log(self, category: str, message: str):
         """propagate the output to every channel"""
-        if not self.started and not core.quiet:
+        if (
+            not self.started
+            or
+            "cli" not in self.channels.keys()
+        ) and not core.quiet:
             cat_str = rf"[{category.upper()}] " if category else ""
             print(f"{cat_str}{message}")
             return
@@ -292,13 +296,15 @@ class Manager:
                 # skip so that we can load it as the last one manually at the end
                 continue
 
-            self.log("core", f"Starting channel {channel_name}")
+            self.log("core", f"Starting channel: {channel_name}")
 
             await channel.on_ready()
             self._async_tasks.add(asyncio.create_task(channel.run()))
             self._async_tasks.add(asyncio.create_task(channel._start_push_queue()))
 
         if "cli" in self.channels.keys():
+            self.log("core", f"Starting channel: CLI")
+
             cli_chan = self.channels["cli"]
             await cli_chan.on_ready()
             self._async_tasks.add(asyncio.create_task(cli_chan.run()))
