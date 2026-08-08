@@ -146,7 +146,6 @@ async function handleWebSocketMessage(data) {
             // handle state based on the current segment
             const current_segment = stream.turn.messages[stream.turn.messages.length - 1];
             const segment_type = current_segment.type;
-            console.log(segment_type);
 
             switch (segment_type) {
                 case "reasoning":
