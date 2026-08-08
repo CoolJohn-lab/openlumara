@@ -830,8 +830,8 @@ class Channel:
                         async for _ in check_chunk_boundary():
                             yield _
 
-                        yield text_to_token("thinking..")
-                        char_counter += len("thinking..")
+                        yield text_to_token("thinking..\n")
+                        char_counter += len("thinking..\n")
                     shown_reasoning_indicator = True
 
             elif segment_type == "content":
