@@ -139,7 +139,9 @@ class Client(discord.Client):
                             # send the pure command to the AI
                             # command authorization checks were moved to the core framework
                             # so that it's much more secure
-                            content = f"{cmd_prefix}{' '.join(cmd)}"
+                            content = f"{cmd_prefix}{cmd}"
+                            if args:
+                                content += ' '.join(args)}
                         else:
                             orig_content = str(content)
                             content = ""
