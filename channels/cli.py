@@ -119,7 +119,7 @@ class Cli(core.channel.Channel):
         return "█" * filled + "░" * empty
 
     def bottom_bar(self):
-        model = self.manager.API.get_model()
+        model = self.manager.API.get_model() or "model not set"
         max_tokens = core.config.get('api', 'max_context')
         api_url = core.config.get('api', 'url')
 
