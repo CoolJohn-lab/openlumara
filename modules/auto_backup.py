@@ -68,7 +68,7 @@ class AutoBackup(core.module.Module):
                 
                 # Calculate how long to wait based on last backup time
                 wait_time = await self._calculate_wait_time(interval_seconds)
-                wait_days = wait_time / 86400
+                wait_days = int(wait_time / 86400)
 
                 if wait_time > 0:
                     self.channel.log(self.name, f"Waiting {wait_days} day(s) until next backup")
