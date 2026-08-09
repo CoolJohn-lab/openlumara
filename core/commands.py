@@ -78,7 +78,7 @@ def get_commands(modules_dict: dict = None):
 
 class Commands:
     # delete these after they are shown to the user once
-    GHOST = ("help", "new", "clear", "context", "prompt", "tools")
+    GHOST = ("help", "new", "clear", "context", "prompt", "tools", "chats", "chat")
     PUBLIC_COMMANDS = ("new", "clear", "status", "stop")
     
     # command definitions - maps command name to help text
@@ -92,7 +92,7 @@ class Commands:
         },
         "chat": {
             "": "show details about current chat",
-            "<ID>": "loads a chat by its ID",
+            "<number>": "loads a chat by its number in the chats list",
             "rename <name>": "renames current chat",
             "category <category>": "puts chat in that category",
         },
@@ -310,10 +310,10 @@ class Commands:
         # Get chats for this page
         page_chats = sorted_chats[start_idx:end_idx]
         
-        result = f"Saved chats for {self.channel.name} (page {page_number}/{total_pages}, showing {start_idx + 1}-{end_idx} of {total_chats}):\n"
-        for conv in page_chats:
-            date_str = datetime.datetime.fromisoformat(conv.get('updated')).strftime("%x %X")
-            result += f"- [{date_str}] [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
+        result = f"saved chats for {self.channel.name} (page {page_number}/{total_pages}, showing {start_idx + 1}-{end_idx} of {total_chats}):\n"
+        for idx, conv in enumerate(page_chats):
+            local_idx = start_idx + idx + 1  # global position
+            result += f"- [{local_idx}] {conv.get('title')[:50]}\n"
         
         return result
 
@@ -360,10 +360,24 @@ class Commands:
                     return "setting category failed"
                 return f"chat categorised into {newcat}"
             case _:
-                result = await self.channel.context.chat.load(args[0])
-                if not result:
-                    return "failed to load chat"
-                return "chat loaded"
+                # if the argument is a number, treat it as position in the sorted list (1 = most recent)
+                arg = args[0]
+                try:
+                    position = int(arg)
+                    all_chats = self.channel.context.chat.get_all()
+                    sorted_chats = sorted(all_chats, key=lambda x: x.get('updated', ''), reverse=True)
+                    if position < 1 or position > len(sorted_chats):
+                        return "chat with that position doesn't exist"
+                    target_id = sorted_chats[position - 1]["id"]
+                    result = await self.channel.context.chat.load(target_id)
+                    if not result:
+                        return "failed to load chat"
+                    return "chat loaded"
+                except ValueError:
+                    result = await self.channel.context.chat.load(arg)
+                    if not result:
+                        return "failed to load chat"
+                    return "chat loaded"
     
     async def cmd_compress(self, args: list):
         await self.channel.push("Compressing your chat history..")
