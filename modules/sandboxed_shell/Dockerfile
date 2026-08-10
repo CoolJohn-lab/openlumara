@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM debian:stable
 
 # env variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -50,6 +50,7 @@ RUN apt-get clean
 
 # create user and set up virtual environment
 RUN useradd -m -u 1000 -s /bin/bash lumara && chown -R 1000:1000 /home/lumara
+USER lumara
 
 # set environment
 ENV HOME=/home/lumara
