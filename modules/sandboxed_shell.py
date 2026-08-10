@@ -335,6 +335,7 @@ class SandboxedShell(core.module.Module):
             '--user', f"{uid}:{gid}",
             '--cap-drop', 'ALL',
             '--cap-add', 'KILL',
+            '--security-opt', 'no-new-privileges:true',
             '--cpus', str(self.config.get("cpu_limit", default=0.5)),
             '--memory', self.config.get("memory_limit", default="512m"),
             '--pids-limit', str(self.config.get("max_processes", default=10)),
