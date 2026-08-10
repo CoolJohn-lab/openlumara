@@ -366,9 +366,12 @@ class SandboxedShell(core.module.Module):
 
         try:
             stdout, stderr, exit_code, _ = await self._run_async_cmd(cmd, timeout=30.0, limit=1024 * 1024)
-            self.log("sandbox_shell", f"Container {self.container_name} started (UID: {uid}, Image: {img}, method: {method}).")
             if stderr:
                 self.log("sandbox_shell", f"ERROR: {stderr}")
+                self.container_name = None
+                return
+
+            self.log("sandbox_shell", f"Container {self.container_name} started (UID: {uid}, Image: {img}, method: {method}).")
         except Exception as e:
             self.log("sandbox_shell", f"Error starting container: {e}")
             self.container_name = None
