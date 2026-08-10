@@ -81,10 +81,6 @@ class SandboxedShell(core.module.Module):
         "run_as_user": {
             "default": "",
             "description": "User ID to run the container processes as. Defaults to your current host user's uid for safe file ownership."
-        },
-        "build_on_start": {
-            "default": True,
-            "description": "Whether to build the Docker image from the Dockerfile on module start. If disabled, only builds when explicitly requested."
         }
     }
 
@@ -294,24 +290,12 @@ class SandboxedShell(core.module.Module):
         img = self.config.get("image", default="debian:stable-slim")
 
         if method == "dockerfile":
-            if dockerfile_path and self.config.get("build_on_start", default=True):
+            if dockerfile_path:
                 built_image = await self._build_image()
                 if built_image:
                     img = built_image
                 else:
                     self.log("sandbox_shell", "Build failed, using default image.")
-            elif dockerfile_path:
-                # build_on_start is false - check if image exists
-                full_image = "openlumara_sandbox:latest"
-                try:
-                    stdout, _, _, _ = await self._run_async_cmd(
-                        [self.runtime, 'images', '--format', '{{.Repository}}:{{.Tag}}', full_image],
-                        timeout=5.0, limit=256
-                    )
-                    if full_image not in stdout.decode('utf-8'):
-                        self.log("sandbox_shell", f"Image {full_image} not found. Run 'shell_build' to build it.")
-                except Exception:
-                    self.log("sandbox_shell", f"Image {full_image} not found. Run 'shell_build' to build it.")
             else:
                 self.log("sandbox_shell", "No dockerfile_path set, using default image.")
 
@@ -360,7 +344,7 @@ class SandboxedShell(core.module.Module):
             '--stop-timeout', '1'
         ])
 
-        if self.config.get("read_only", default=False):
+        if self.config.get("read_only", default=True):
             cmd.extend(['--read-only', '--tmpfs', '/tmp'])
 
         home_dir = "/home/lumara"
@@ -471,7 +455,9 @@ class SandboxedShell(core.module.Module):
             self.log("sandbox_shell", "Neither docker nor podman are available!")
             return
 
-        self.host_workspace = os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox"))
+        self.host_workspace = core.get_path(
+            os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox"))
+        )
         os.makedirs(self.host_workspace, exist_ok=True)
 
         # resolve host user uid for safe file ownership

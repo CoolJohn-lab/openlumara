@@ -21,7 +21,14 @@ RUN apt-get install -y --no-install-recommends \
     file \
     tree \
     procps \
+    cron \
     ssh \
+    iputils-ping \
+    iproute2 \
+    net-tools \
+    lsof \
+    strace \
+    dnsutils \
     python3 python3-venv python3-pip \
     nodejs npm
 RUN apt-get clean
