@@ -11,25 +11,23 @@ import core
 
 class SandboxedShell(core.module.Module):
     """
-    Lets your AI safely run shell commands in a persistent sandboxed container.
-    The container starts once at module init and persists until shutdown.
-    Runs asynchronously to prevent blocking the framework.
+    Lets your AI safely run shell commands in a persistent sandboxed docker/podman container
     """
 
     header = "Shell"
 
     settings = {
         "internet_access": {
-            "default": False,
+            "default": True,
             "description": "Whether the sandbox container has access to the internet"
         },
         "read_only": {
-            "default": False,
-            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes. Note: setting this to True will prevent package installation."
+            "default": True,
+            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
         },
         "persistent_data": {
             "default": True,
-            "description": "When on, the /data folder in the sandbox is persistent (and mapped to your host system). When off, it's a temporary folder in RAM (tmpfs)"
+            "description": "When on, the home folder inside the sandbox is persistent and mapped to the folder you specify. When off, it's a temporary folder in RAM (tmpfs)"
         },
         "sandbox_path": {
             "default": "~/sandbox",
@@ -38,11 +36,11 @@ class SandboxedShell(core.module.Module):
         },
         "temporary_filesystem_size_limit": {
             "default": "512m",
-            "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g). Only works when persistent_data is off.",
+            "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g)",
             "depends": {"persistent_data": False}
         },
         "execution_timeout": {
-            "default": 10,
+            "default": 30,
             "description": "Maximum amount of time (in seconds) a process inside the shell is allowed to run for"
         },
         "output_limit": {
