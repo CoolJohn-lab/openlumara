@@ -192,13 +192,12 @@ class SandboxedShell(core.module.Module):
                                 timeout=5.0, limit=1024
                             )
                             stats_json = json.loads(stdout.decode('utf-8'))
-                            current_mem_bytes = stats_json.get("MemUsage", 0)
+                            current_mem_bytes = float(stats_json.get("MemUsage", 0))
                         except Exception:
                             pass
 
                     # skip loop iteration if we couldn't get a valid memory value
                     if not current_mem_bytes:
-                        self.log(self.name, "Warning: Could not get RAM usage. Memory overflow attacks could occur.")
                         continue
 
                     if current_mem_bytes and current_mem_bytes > limit_bytes:
