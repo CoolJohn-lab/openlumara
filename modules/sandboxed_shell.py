@@ -21,10 +21,6 @@ class SandboxedShell(core.module.Module):
             "default": True,
             "description": "Whether the sandbox container has access to the internet"
         },
-        "read_only": {
-            "default": True,
-            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
-        },
         "persistent_data": {
             "default": True,
             "description": "When on, the home folder inside the sandbox is persistent and mapped to the folder you specify. When off, it's a temporary folder in RAM (tmpfs)"
@@ -57,7 +53,7 @@ class SandboxedShell(core.module.Module):
             "description": "Maximum amount of RAM use to allow (example: 150kb, 256m, 2gb)"
         },
         "max_processes": {
-            "default": 10,
+            "default": 200,
             "description": "Maximum amount of processes to allow"
         },
         "method": {
@@ -344,9 +340,6 @@ class SandboxedShell(core.module.Module):
             '--stop-timeout', '1'
         ])
 
-        if self.config.get("read_only", default=True):
-            cmd.extend(['--read-only', '--tmpfs', '/tmp'])
-
         home_dir = "/home/lumara"
         dockerfile_mount = f"{home_dir}/Dockerfile"
 
@@ -367,11 +360,15 @@ class SandboxedShell(core.module.Module):
                 cmd.extend(['-v', f"{expanded_path}:{dockerfile_mount}:ro"])
                 self.log("sandbox_shell", f"Mounted Dockerfile read-only at {dockerfile_mount}")
 
-        cmd.extend(['-w', home_dir, img, 'tail', '-f', '/dev/null'])
+        cmd.extend(['-w', home_dir, img])
+
+        self.log(self.name, "starting using command: "+' '.join(cmd))
 
         try:
             stdout, stderr, exit_code, _ = await self._run_async_cmd(cmd, timeout=30.0, limit=1024 * 1024)
             self.log("sandbox_shell", f"Container {self.container_name} started (UID: {uid}, Image: {img}, method: {method}).")
+            if stderr:
+                self.log("sandbox_shell", f"ERROR: {stderr}")
         except Exception as e:
             self.log("sandbox_shell", f"Error starting container: {e}")
             self.container_name = None
