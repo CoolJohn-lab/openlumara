@@ -1,15 +1,16 @@
 FROM debian:latest
 
-# avoid interactive prompts during apt
+# env variables
 ENV DEBIAN_FRONTEND=noninteractive
-
-# pip is annoying
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+# update
+RUN apt-get update
+
 # Set locale to en_US.UTF-8 and timezone to UTC
-# thanks to agentzero's team for figuring this out,
+# thanks to agentzero's team (https://github.com/agent0ai/agent-zero) for figuring this out,
 # i copied it from them
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y locales tzdata
+RUN apt-get install -y locales tzdata
 RUN sed -i -e 's/# \(en_US\.UTF-8 .*\)/\1/' /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales && \
     update-locale LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
@@ -22,7 +23,6 @@ ENV LC_ALL=en_US.UTF-8
 ENV TZ=UTC
 
 # install base tools
-RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
     curl \
     wget \
