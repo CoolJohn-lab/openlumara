@@ -103,7 +103,7 @@ class Characters(core.module.Module):
         if not character:
             return f"character {name} does not exist!"
 
-        response = await self.switch(character)
+        response = await self.switch(name)
 
         char_name = self._find_char_name(name)
         return f"character switched to {char_name}"
