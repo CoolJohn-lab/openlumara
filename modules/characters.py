@@ -213,7 +213,7 @@ class Characters(core.module.Module):
                 return self.result("character data not found and auto conversion of legacy character format failed", False)
 
             char_data = {
-                "name": name,
+                "name": self._find_char_name(name),
                 "description": char.get("identity")
             }
 
