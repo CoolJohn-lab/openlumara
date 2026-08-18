@@ -274,7 +274,7 @@ class Coder(core.module.Module):
     # helper functions: templates
     # ---------------------------
     async def _get_template_folders(self):
-        template_folders = list(self.config.get("template_paths"))
+        template_folders = list(self.config.get("template_paths", default=[]))
 
         # add the internal templates path to the list of template folders
         if self.config.get("enable_builtin_templates"):
