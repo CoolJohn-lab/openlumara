@@ -3,6 +3,20 @@ function isToggleList(data) {
     return Array.isArray(data.enabled) && Array.isArray(data.disabled);
 }
 
+const SENSITIVE_KEY_EXCEPTIONS = new Set(['auth_type', 'auth_header_name']);
+const SENSITIVE_KEYWORDS = ['token', 'key', 'secret', 'password', 'auth', 'credential'];
+
+function settingKeyTail(key) {
+    const parts = String(key || '').split('.');
+    return (parts[parts.length - 1] || '').toLowerCase();
+}
+
+function isSensitiveSettingKey(key) {
+    const tail = settingKeyTail(key);
+    if (!tail || SENSITIVE_KEY_EXCEPTIONS.has(tail)) return false;
+    return SENSITIVE_KEYWORDS.some((kw) => tail.includes(kw));
+}
+
 function detectFieldType(value, key = '') {
     // special keys that should be displayed in a special way
     switch (key) {
@@ -13,17 +27,64 @@ function detectFieldType(value, key = '') {
     }
 
     // standard types
-    if (value === null || value === undefined) return 'text';
-    else if (typeof value === 'boolean') return 'boolean';
+    if (value === null || value === undefined) {
+        return isSensitiveSettingKey(key) ? 'secret' : 'text';
+    } else if (typeof value === 'boolean') return 'boolean';
     else if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
     else if (Array.isArray(value)) return 'array';
     else if (typeof value === 'string') {
+        if (isSensitiveSettingKey(key)) return 'secret';
         if (value.match(/^https?:\/\//)) return 'url';
         else if (value.includes('\n')) return 'textarea';
         else return 'text';
     } else {
         return 'text';
     }
+}
+
+function normalizeFieldType(type, schemaValue, fullKey) {
+    if (type === 'long_text') return 'textarea';
+    if (type === 'list') return 'array';
+    if (type === 'string') return 'text';
+    if (type === 'secret') return 'secret';
+    const resolved = type || detectFieldType(schemaValue, fullKey);
+    if ((resolved === 'text' || resolved === 'textarea' || resolved === 'url') && isSensitiveSettingKey(fullKey)) {
+        return 'secret';
+    }
+    return resolved;
+}
+
+function schemaFieldDefaults(itemSchema) {
+    const obj = {};
+    for (const [k, fs] of Object.entries(itemSchema || {})) {
+        if (fs && typeof fs === 'object' && fs.default !== undefined) {
+            obj[k] = fs.default;
+        } else if (fs && fs.type === 'boolean') {
+            obj[k] = false;
+        } else if (fs && (fs.type === 'array' || fs.type === 'list')) {
+            obj[k] = [];
+        } else if (fs && fs.type === 'object') {
+            obj[k] = {};
+        } else if (fs && fs.type === 'number') {
+            obj[k] = 0;
+        } else {
+            obj[k] = '';
+        }
+    }
+    return obj;
+}
+
+function buildObjectListItem(item, itemSchema, prefix) {
+    const merged = Object.assign(
+        {},
+        schemaFieldDefaults(itemSchema),
+        (item && typeof item === 'object' && !Array.isArray(item)) ? item : {}
+    );
+    return buildFieldSettings(merged, itemSchema, prefix);
+}
+
+function defaultObjectListItem(itemSchema, prefix) {
+    return buildObjectListItem({}, itemSchema, prefix || 'item');
 }
 
 function buildSettingsStructure(originalData, moduleInfo = {}) {
@@ -120,12 +181,28 @@ function buildFieldSettings(obj, schema, prefix = '') {
         // Check if schema defines this field with metadata
         const hasSchemaDefinition = fieldSchema && (fieldSchema.type !== undefined || fieldSchema.default !== undefined || fieldSchema.description !== undefined);
 
+        if (hasSchemaDefinition && fieldSchema.type === 'object_list') {
+            const itemSchema = fieldSchema.item_schema || {};
+            const items = Array.isArray(value) ? value : [];
+            settings[key] = {
+                title: formatLabel(key),
+                type: 'object_list',
+                description: fieldSchema.description || null,
+                unsafe: fieldSchema.unsafe || false,
+                depends: fieldSchema.depends || null,
+                item_schema: itemSchema,
+                item_label: fieldSchema.item_label || 'item',
+                value: items.map((item, i) => buildObjectListItem(item, itemSchema, `${fullKey}.${i}`))
+            };
+            continue;
+        }
+
         if (hasSchemaDefinition) {
             // Schema defines the field - use schema for metadata, value for current value
             const schemaValue = fieldSchema.default !== undefined ? fieldSchema.default : value;
             settings[key] = {
                 title: formatLabel(key),
-                type: fieldSchema.type === 'long_text' ? 'textarea' : (fieldSchema.type || detectFieldType(schemaValue, fullKey)),
+                type: normalizeFieldType(fieldSchema.type, schemaValue, fullKey),
                 description: fieldSchema.description || null,
                 unsafe: fieldSchema.unsafe || false,
                 value: value,

@@ -27,34 +27,150 @@ class Mcp(core.module.Module):
 
     # imported lazily inside methods so the framework still loads this module
     # (and can show its settings) even when the `mcp` SDK is not installed.
-    dependencies: ClassVar[list] = ["mcp"]
+    # httpx is listed so the ntfy auto-uninstaller cannot strip it while MCP
+    # is enabled. Must be a plain assignment: the installer AST-walks
+    # ast.Assign only and misses ClassVar annotations.
+    dependencies = ["mcp", "httpx"]
 
     settings: ClassVar[dict] = {
         "servers": {
+            "type": "object_list",
+            "item_label": "server",
             "default": [],
             "description": (
-                "List of remote MCP servers to connect to. Each entry is an "
-                'object: {"name": short id, "url": server URL, '
-                '"transport": "http" (Streamable HTTP, default) or "sse", '
-                '"headers": optional object of HTTP headers e.g. an '
-                'Authorization bearer token, "enabled": optional bool '
-                "(default true)}. Example: "
-                '[{"name": "github", '
-                '"url": "https://api.githubcopilot.com/mcp/", '
-                '"transport": "http", '
-                '"headers": {"Authorization": "Bearer ghp_xxx"}, '
-                '"enabled": true}]. '
-                "URLs/headers are user-provided and trusted-by-config; MCP tool "
-                "OUTPUT is untrusted content fed to the model."
+                "Remote MCP servers to connect to. Each card is one server. "
+                "URLs and API keys are user-provided and trusted-by-config; "
+                "MCP tool OUTPUT is untrusted content fed to the model."
             ),
+            "item_schema": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Connect to this server and register its tools.",
+                },
+                "name": {
+                    "type": "text",
+                    "default": "",
+                    "description": "Short id used in tool names (`mcp_<name>_<tool>`).",
+                },
+                "url": {
+                    "type": "url",
+                    "default": "",
+                    "description": "MCP server URL (Streamable HTTP or SSE endpoint).",
+                },
+                "transport": {
+                    "type": "select",
+                    "default": "http",
+                    "options": {
+                        "http": "Streamable HTTP (default for most remote MCP servers).",
+                        "sse": "Server-Sent Events transport.",
+                    },
+                    "description": "How to talk to the server.",
+                },
+                "auth_type": {
+                    "type": "select",
+                    "default": "none",
+                    "options": {
+                        "none": "No auth header.",
+                        "bearer": "Authorization: Bearer <api_key>.",
+                        "header": "Send api_key as a custom header (see auth header name).",
+                    },
+                    "description": "How to attach the API key to requests.",
+                },
+                "api_key": {
+                    "type": "secret",
+                    "default": "",
+                    "description": "Secret used for bearer or custom-header auth. Never shown in plaintext.",
+                },
+                "auth_header_name": {
+                    "type": "text",
+                    "default": "Authorization",
+                    "description": "Header name used when auth type is `header`.",
+                    "depends": {"auth_type": "header"},
+                },
+                "extra_headers": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Additional HTTP headers merged on top of auth (key/value).",
+                },
+                "timeout": {
+                    "type": "number",
+                    "default": 0,
+                    "min": 0,
+                    "description": "Per-server timeout in seconds. 0 uses the module default.",
+                },
+                "include_tools": {
+                    "type": "array",
+                    "default": [],
+                    "description": "If non-empty, only these original MCP tool names are registered.",
+                },
+                "exclude_tools": {
+                    "type": "array",
+                    "default": [],
+                    "description": "Original MCP tool names to skip even if include is empty/matches.",
+                },
+                "notes": {
+                    "type": "textarea",
+                    "default": "",
+                    "description": "Optional notes for yourself (not sent to the server).",
+                },
+            },
         },
         "call_timeout": {
+            "type": "number",
             "default": 60,
+            "min": 1,
             "description": (
-                "Timeout (seconds) for a single MCP operation: the "
-                "connect/initialize/list-tools handshake and each tool call. A "
-                "server that hangs is logged and skipped, never crashes the "
-                "module."
+                "Timeout (seconds) for a single MCP tool call. A server that hangs "
+                "is logged and skipped, never crashes the module."
+            ),
+        },
+        "connect_timeout": {
+            "type": "number",
+            "default": 30,
+            "min": 1,
+            "description": (
+                "Timeout (seconds) for the connect/initialize/list-tools handshake."
+            ),
+        },
+        "verify_tls": {
+            "type": "boolean",
+            "default": True,
+            "description": "Verify TLS certificates when connecting to MCP servers.",
+        },
+        "auto_register_on_ready": {
+            "type": "boolean",
+            "default": True,
+            "description": (
+                "Connect and register tools when the module loads. Turn off to keep "
+                "the module idle until you run `/mcp refresh`."
+            ),
+        },
+        "wrap_untrusted_output": {
+            "type": "boolean",
+            "default": True,
+            "description": (
+                "Wrap MCP tool results as untrusted remote content so the model is "
+                "told not to follow instructions embedded in them."
+            ),
+        },
+        "max_tools_per_server": {
+            "type": "number",
+            "default": 0,
+            "min": 0,
+            "description": "Cap how many tools to register per server. 0 means no cap.",
+        },
+        "log_calls": {
+            "type": "boolean",
+            "default": False,
+            "description": "Log each MCP tool call (server and tool name only, not arguments).",
+        },
+        "skip_failed_servers": {
+            "type": "boolean",
+            "default": True,
+            "description": (
+                "If a server fails to connect, skip it and continue. Turn off to "
+                "treat a failed server as a module setup error."
             ),
         },
     }
@@ -70,11 +186,80 @@ class Mcp(core.module.Module):
     # settings / helpers
     # ------------------------------------------------------------------
 
-    def _call_timeout(self) -> float:
+    def _float_setting(self, key: str, default: float) -> float:
         try:
-            return float(self.config.get("call_timeout", 60))
+            return float(self.config.get(key, default=default))
         except (TypeError, ValueError):
-            return 60.0
+            return float(default)
+
+    def _int_setting(self, key: str, default: int) -> int:
+        try:
+            return int(self.config.get(key, default=default))
+        except (TypeError, ValueError):
+            return int(default)
+
+    def _bool_setting(self, key: str, default: bool) -> bool:
+        value = self.config.get(key, default=default)
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "on")
+        return bool(value) if value is not None else default
+
+    def _call_timeout(self) -> float:
+        return self._float_setting("call_timeout", 60)
+
+    def _connect_timeout(self) -> float:
+        return self._float_setting("connect_timeout", 30)
+
+    def _server_timeout(self, server: dict, kind: str) -> float:
+        """Per-server timeout, or the module default for `kind` (`call` / `connect`)."""
+        try:
+            per = float(server.get("timeout") or 0)
+        except (TypeError, ValueError):
+            per = 0.0
+        if per > 0:
+            return per
+        return self._call_timeout() if kind == "call" else self._connect_timeout()
+
+    @staticmethod
+    def _as_str_list(value) -> list:
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    @staticmethod
+    def _build_headers(entry: dict) -> dict:
+        """Build HTTP headers from auth_type + api_key, then merge extra_headers.
+
+        Legacy `headers` dicts (from the old JSON-blob setting) are still honored
+        as a base layer so existing config.yml entries keep working.
+        """
+        headers = {}
+
+        legacy = entry.get("headers")
+        if isinstance(legacy, dict):
+            for key, value in legacy.items():
+                if value is None:
+                    continue
+                headers[str(key)] = str(value)
+
+        auth_type = str(entry.get("auth_type") or "none").strip().lower()
+        api_key = entry.get("api_key")
+        api_key = "" if api_key is None else str(api_key)
+
+        if auth_type == "bearer" and api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif auth_type == "header" and api_key:
+            header_name = str(entry.get("auth_header_name") or "Authorization").strip()
+            headers[header_name or "Authorization"] = api_key
+
+        extra = entry.get("extra_headers")
+        if isinstance(extra, dict):
+            for key, value in extra.items():
+                if value is None:
+                    continue
+                headers[str(key)] = str(value)
+
+        return headers
 
     def _get_servers(self):
         """Return the list of validated, enabled server config dicts."""
@@ -82,6 +267,7 @@ class Mcp(core.module.Module):
         if not isinstance(raw, list):
             return []
 
+        verify_tls = self._bool_setting("verify_tls", True)
         servers = []
         for entry in raw:
             if not isinstance(entry, dict):
@@ -90,7 +276,7 @@ class Mcp(core.module.Module):
             name = entry.get("name") or entry.get("key")
             url = entry.get("url")
             if not name or not url:
-                self.log("mcp", f"skipping MCP server with missing name/url: {entry!r}")
+                self.log("mcp", "skipping MCP server with missing name/url")
                 continue
 
             if entry.get("enabled", True) is False:
@@ -104,16 +290,16 @@ class Mcp(core.module.Module):
                 )
                 transport = "http"
 
-            headers = entry.get("headers")
-            if not isinstance(headers, dict):
-                headers = {}
-
             servers.append(
                 {
                     "name": str(name),
                     "url": str(url),
                     "transport": transport,
-                    "headers": headers,
+                    "headers": self._build_headers(entry),
+                    "timeout": entry.get("timeout") or 0,
+                    "verify_tls": verify_tls,
+                    "include_tools": self._as_str_list(entry.get("include_tools")),
+                    "exclude_tools": self._as_str_list(entry.get("exclude_tools")),
                 }
             )
         return servers
@@ -124,6 +310,15 @@ class Mcp(core.module.Module):
                 return server
         return None
 
+    def _tool_allowed(self, server: dict, tool_name: str) -> bool:
+        include = server.get("include_tools") or []
+        exclude = server.get("exclude_tools") or []
+        if include and tool_name not in include:
+            return False
+        if tool_name in exclude:
+            return False
+        return True
+
     @staticmethod
     def _sanitize(value: str) -> str:
         """Make a stable, tool-name-safe suffix out of arbitrary server/tool names."""
@@ -131,6 +326,32 @@ class Mcp(core.module.Module):
         value = re.sub(r"[^0-9A-Za-z_]+", "_", value)
         value = re.sub(r"_+", "_", value).strip("_")
         return value or "x"
+
+    def _httpx_client_factory(self, server: dict):
+        """httpx factory so we can set TLS verification without forking the MCP SDK."""
+        import httpx  # type: ignore[reportMissingImports]
+
+        verify = server.get("verify_tls", True)
+
+        def factory(headers=None, timeout=None, auth=None):
+            kwargs = {
+                "follow_redirects": True,
+                "verify": verify,
+            }
+            if timeout is None:
+                kwargs["timeout"] = httpx.Timeout(
+                    self._server_timeout(server, "connect"),
+                    read=max(self._server_timeout(server, "call"), 300.0),
+                )
+            else:
+                kwargs["timeout"] = timeout
+            if headers is not None:
+                kwargs["headers"] = headers
+            if auth is not None:
+                kwargs["auth"] = auth
+            return httpx.AsyncClient(**kwargs)
+
+        return factory
 
     @contextlib.asynccontextmanager
     async def _open_session(self, server: dict):
@@ -150,15 +371,31 @@ class Mcp(core.module.Module):
         transport = server["transport"]
         url = server["url"]
         headers = server["headers"] or None
+        connect_timeout = self._server_timeout(server, "connect")
+        call_timeout = self._server_timeout(server, "call")
+        factory = self._httpx_client_factory(server)
+        sse_read_timeout = max(call_timeout, 300.0)
 
         if transport == "sse":
             from mcp.client.sse import sse_client  # type: ignore
 
-            client_cm = sse_client(url=url, headers=headers)
+            client_cm = sse_client(
+                url=url,
+                headers=headers,
+                timeout=connect_timeout,
+                sse_read_timeout=sse_read_timeout,
+                httpx_client_factory=factory,
+            )
         else:
             from mcp.client.streamable_http import streamablehttp_client  # type: ignore
 
-            client_cm = streamablehttp_client(url=url, headers=headers)
+            client_cm = streamablehttp_client(
+                url=url,
+                headers=headers,
+                timeout=connect_timeout,
+                sse_read_timeout=sse_read_timeout,
+                httpx_client_factory=factory,
+            )
 
         async with client_cm as streams:
             # streamablehttp_client yields (read, write, get_session_id);
@@ -215,7 +452,9 @@ class Mcp(core.module.Module):
                 success=False,
             )
 
-        timeout = self._call_timeout()
+        timeout = self._server_timeout(server, "call")
+        if self._bool_setting("log_calls", False):
+            self.log("mcp", f"calling {server_name}/{tool_name}")
 
         try:
 
@@ -240,6 +479,9 @@ class Mcp(core.module.Module):
         text = self._flatten_content(result)
         is_error = bool(getattr(result, "isError", False))
 
+        if not self._bool_setting("wrap_untrusted_output", True):
+            return self.result(text, success=not is_error)
+
         payload = {
             "server": server_name,
             "tool": tool_name,
@@ -249,11 +491,16 @@ class Mcp(core.module.Module):
         }
         return self.result(payload, success=not is_error)
 
-    def _register_tool(self, server_name: str, tool) -> bool:
+    def _register_tool(self, server: dict, tool) -> bool:
         """Register one discovered MCP tool with the manager. Returns True if added."""
-        method_name = (
-            f"{self._sanitize(server_name)}_{self._sanitize(getattr(tool, 'name', 'tool'))}"
-        )
+        server_name = server["name"]
+        original_name = getattr(tool, "name", None)
+        if not original_name:
+            return False
+        if not self._tool_allowed(server, original_name):
+            return False
+
+        method_name = f"{self._sanitize(server_name)}_{self._sanitize(original_name)}"
 
         # never shadow a real class-method tool (list_servers / refresh) or the
         # reflective loader would double-register the name after on_ready.
@@ -270,10 +517,6 @@ class Mcp(core.module.Module):
 
         full_name = f"{self.name}_{method_name}"
         if full_name in self.manager.tool_names:
-            return False
-
-        original_name = getattr(tool, "name", None)
-        if not original_name:
             return False
 
         schema = getattr(tool, "inputSchema", None)
@@ -309,7 +552,8 @@ class Mcp(core.module.Module):
     async def _register_server(self, server: dict) -> int:
         """Connect to one server, list its tools, register them. Returns count."""
         name = server["name"]
-        timeout = self._call_timeout()
+        timeout = self._server_timeout(server, "connect")
+        max_tools = self._int_setting("max_tools_per_server", 0)
 
         try:
 
@@ -322,18 +566,28 @@ class Mcp(core.module.Module):
             self.log(
                 "mcp", f"server '{name}' timed out during connect/list after {timeout}s; skipping"
             )
+            if not self._bool_setting("skip_failed_servers", True):
+                raise
             return 0
         except Exception as e:
             self.log(
                 "mcp", f"could not connect to server '{name}': {core.detail_error(e)}; skipping"
             )
+            if not self._bool_setting("skip_failed_servers", True):
+                raise
             return 0
 
         tools = getattr(listed, "tools", None) or []
         count = 0
         for tool in tools:
+            if max_tools > 0 and count >= max_tools:
+                self.log(
+                    "mcp",
+                    f"server '{name}': hit max_tools_per_server ({max_tools}); stopping registration",
+                )
+                break
             try:
-                if self._register_tool(name, tool):
+                if self._register_tool(server, tool):
                     count += 1
             except Exception as e:
                 self.log(
@@ -361,25 +615,19 @@ class Mcp(core.module.Module):
         self._registered = {}
         self._registered_tool_names = []
 
-    # ------------------------------------------------------------------
-    # lifecycle
-    # ------------------------------------------------------------------
-
-    async def on_ready(self):
-        # idempotent: clear any prior registration (handles reload/refresh)
-        self._teardown()
-
+    async def _register_all(self):
+        """Connect to every configured server and register their tools."""
         servers = self._get_servers()
         if not servers:
-            # inert until configured
             return
 
         try:
             import mcp  # type: ignore  # noqa: F401
+            import httpx  # type: ignore  # noqa: F401
         except ImportError:
             self.log(
                 "mcp",
-                "the `mcp` python package is not installed - MCP client is inert. Install it (pip install mcp) and restart.",
+                "the `mcp` or `httpx` python package is not installed - MCP client is inert. Install them (pip install mcp httpx) and restart.",
             )
             return
 
@@ -392,8 +640,28 @@ class Mcp(core.module.Module):
                     "mcp",
                     f"unexpected error setting up server '{server.get('name')}': {core.detail_error(e)}",
                 )
+                if not self._bool_setting("skip_failed_servers", True):
+                    raise
 
         self.log("mcp", f"MCP client ready: {total} tool(s) across {len(servers)} server(s)")
+
+    # ------------------------------------------------------------------
+    # lifecycle
+    # ------------------------------------------------------------------
+
+    async def on_ready(self):
+        # idempotent: clear any prior registration (handles reload/refresh)
+        self._teardown()
+
+        if not self._get_servers():
+            # inert until configured
+            return
+
+        if not self._bool_setting("auto_register_on_ready", True):
+            self.log("mcp", "auto-register disabled; use /mcp refresh to connect")
+            return
+
+        await self._register_all()
 
     async def on_shutdown(self):
         self._teardown()
@@ -440,7 +708,8 @@ class Mcp(core.module.Module):
         re-registering the live set. Use after changing server config or when a
         server was down. Returns the resulting server/tool summary.
         """
-        await self.on_ready()
+        self._teardown()
+        await self._register_all()
         return await self.list_servers()
 
     # ------------------------------------------------------------------
@@ -455,7 +724,8 @@ class Mcp(core.module.Module):
             args: optional subcommand ('refresh' to reconnect, otherwise show status)
         """
         if args and str(args[0]).strip().lower() == "refresh":
-            await self.on_ready()
+            self._teardown()
+            await self._register_all()
 
         servers = self._get_servers()
         if not servers:

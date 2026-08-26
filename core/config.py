@@ -666,7 +666,9 @@ def get_core_settings_structure():
                 "depends": field_schema.get("depends"),
                 "min": field_schema.get("min"),
                 "max": field_schema.get("max"),
-                "step": field_schema.get("step")
+                "step": field_schema.get("step"),
+                "item_schema": field_schema.get("item_schema"),
+                "item_label": field_schema.get("item_label"),
             }
         
         structure[section_key] = {

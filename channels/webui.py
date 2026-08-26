@@ -102,7 +102,7 @@ class Webui(core.channel.Channel):
             "default": True,
         },
         "show_unsafe_settings": {
-            "description": "Whether to show unsafe settings. This setting has to be manually toggled via `/config` or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
+            "description": "Whether to show unsafe settings. This setting has to be manually toggled via the Settings modal (gear icon), the `/config` command, or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
             "default": False,
             "unsafe": True,
         },
@@ -368,28 +368,36 @@ def verify_session_cookie(secret: str, cookie: str, max_age) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Secret redaction for the config page
+# Secret redaction for the settings APIs
 # ---------------------------------------------------------------------------
 # Mirrors modules/config.py's `_redact_sensitive_info`: values whose KEY name
 # contains one of these keywords are never sent to the browser in plaintext.
 _SENSITIVE_KEYWORDS = ("token", "key", "secret", "password", "auth", "credential")
+# "auth" matches auth_type / auth_header_name, which are not secrets.
+_SENSITIVE_KEY_EXCEPTIONS = frozenset({"auth_type", "auth_header_name"})
 _REDACTED_PLACEHOLDER = "****"
 
 
 def _is_sensitive_key(key) -> bool:
     """True if a config key name marks a secret (same rule as modules/config.py)."""
-    return isinstance(key, str) and any(kw in key.lower() for kw in _SENSITIVE_KEYWORDS)
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    if lowered in _SENSITIVE_KEY_EXCEPTIONS:
+        return False
+    return any(kw in lowered for kw in _SENSITIVE_KEYWORDS)
 
 
 def redact_config_secrets(data):
     """Recursively redact secret values by key name, returning plain dicts/lists.
 
-    Same key-name approach as modules/config.py so the config page never
-    receives API keys, passwords, session secrets, etc. in plaintext."""
+    Same key-name approach as modules/config.py so the settings UI never
+    receives API keys, passwords, session secrets, etc. in plaintext.
+    Non-string values (booleans like api_key_required) are left intact."""
     if isinstance(data, dict):
         result = {}
         for k, v in data.items():
-            if _is_sensitive_key(k):
+            if _is_sensitive_key(k) and isinstance(v, str) and v != "":
                 result[k] = _REDACTED_PLACEHOLDER
             elif isinstance(v, (dict, list)):
                 result[k] = redact_config_secrets(v)
@@ -401,25 +409,56 @@ def redact_config_secrets(data):
     return data
 
 
+def _match_list_item(item, current_list, index):
+    """Match a list-of-dicts item to the stored config by `name`, else by index."""
+    if not isinstance(current_list, list):
+        return None
+    if isinstance(item, dict) and item.get("name"):
+        name = item.get("name")
+        named = [c for c in current_list if isinstance(c, dict) and c.get("name") == name]
+        if len(named) == 1:
+            return named[0]
+        if index < len(current_list):
+            cur = current_list[index]
+            if isinstance(cur, dict) and cur.get("name") == name:
+                return cur
+            if named:
+                return named[0]
+    if index < len(current_list):
+        return current_list[index]
+    return None
+
+
 def restore_redacted_secrets(incoming, current):
     """Return a copy of `incoming` where any secret field still holding the
-    redacted placeholder is restored from the stored `current` config.
+    redacted placeholder (or left blank) is restored from the stored `current`
+    config.
 
-    This stops the config page from ever overwriting a real secret with the
-    "****" placeholder. A field the user actually edited no longer equals the
-    placeholder, so their new value is kept as-is."""
+    Recurses through dicts and lists of dicts (matching by index or `name`) so
+    nested secrets such as MCP `servers[].api_key` are not overwritten with
+    "****". A field the user actually edited no longer equals the placeholder,
+    so their new value is kept as-is."""
     if isinstance(incoming, dict):
         result = {}
         for k, v in incoming.items():
             cur = current.get(k) if isinstance(current, dict) else None
             if _is_sensitive_key(k) and v == _REDACTED_PLACEHOLDER:
-                # keep the stored secret rather than writing back the placeholder
+                result[k] = cur
+            elif _is_sensitive_key(k) and v in ("", None) and cur not in ("", None):
                 result[k] = cur
             elif isinstance(v, dict):
                 result[k] = restore_redacted_secrets(v, cur if isinstance(cur, dict) else {})
+            elif isinstance(v, list):
+                result[k] = restore_redacted_secrets(v, cur if isinstance(cur, list) else [])
             else:
                 result[k] = v
         return result
+    if isinstance(incoming, list):
+        current_list = current if isinstance(current, list) else []
+        return [
+            restore_redacted_secrets(item, _match_list_item(item, current_list, i))
+            for i, item in enumerate(incoming)
+        ]
     return incoming
 
 
@@ -510,26 +549,12 @@ async def create_fastapi(channel):
             },
         )
 
-    # config page - view/edit modules + core settings from the browser.
-    # gated by the same session auth as everything else (see auth_middleware).
+    # old standalone /config page is gone; gear-icon settings modal is the
+    # one settings surface. keep the URL so bookmarks do not 404.
     @app.get("/config")
-    async def config_page(request: fastapi.Request):
-        """The standalone configuration page. Returns HTML, not JSON. Lets the
-        user toggle modules on/off and edit module + core/api settings, then
-        save through the existing config write path."""
-        css_files = get_recursive_assets(
-            os.path.join(channel.assets_path, "css"), "css", skip=["code-themes"]
-        )
-        return channel.templates.TemplateResponse(
-            request,
-            "config.html",
-            {
-                "version": channel.version,
-                "config": channel.config,
-                "css_files": css_files,
-                "login_enabled": channel.config.get("require_login"),
-            },
-        )
+    async def config_page():
+        """Redirects to the main WebUI. Settings live in the gear-icon modal."""
+        return fastapi.responses.RedirectResponse(url="/", status_code=302)
 
     # ---- login
     # -- GET
@@ -718,8 +743,12 @@ async def create_fastapi(channel):
     # -- GET
     @app.get("/api/settings/load")
     async def settings_load():
-        """Returns the core's config object as a json object"""
-        return api_result(core.config.config)
+        """Returns the core's config object as JSON, with secrets redacted by
+        key name (same approach as modules/config.py). API keys, passwords and
+        the session secret are never sent to the browser in plaintext."""
+        core.config.config.load()
+        redacted = redact_config_secrets(copy.deepcopy(dict(core.config.config)))
+        return api_result(redacted)
 
     @app.get("/api/settings/get_module_info")
     async def get_module_info():
@@ -769,57 +798,15 @@ async def create_fastapi(channel):
     # -- POST
     @app.post("/api/settings/save")
     async def settings_save(request: fastapi.Request):
-        """Saves config data to the backend. Accepts a structure that reflects core.config.config exactly (check /api/settings/load to see that structure"""
-        data = await request.json()
-
-        changed_modules = list(data.get("changed_modules", []))
-        data.pop("changed_modules")
-
-        result = core.config.config.load(data=data)
-        core.config.config.save()
-
-        if not result:
-            return api_result(success=False)
-
-        # Reload modules that had their settings changed
-        if changed_modules:
-            for module_name in changed_modules:
-                try:
-                    await channel.manager.reload_module(module_name)
-                except Exception as e:
-                    channel.log(
-                        channel.name,
-                        f"Error reloading module {module_name}: {core.detail_error(e)}",
-                    )
-
-        return api_result(success=True)
-
-    # --- Config page (view/edit config from the browser)
-    # -- GET
-    @app.get("/api/config/view")
-    async def config_view():
-        """Returns the full config for the config page, with secrets redacted
-        by key name (same approach as modules/config.py). API keys, passwords
-        and the session secret are never sent to the browser in plaintext."""
-        # reload the live config from disk, then redact before it leaves the box
-        core.config.config.load()
-        redacted = redact_config_secrets(copy.deepcopy(dict(core.config.config)))
-        return api_result(redacted)
-
-    # -- POST
-    @app.post("/api/config/save")
-    async def config_save(request: fastapi.Request):
-        """Persists edits from the config page through the SAME ConfigManager
-        write path as /api/settings/save (core.config.config.load + save, then
-        reload changed modules). Before writing, any secret still holding the
-        redacted placeholder is restored from the stored config, so a
-        placeholder can never overwrite a real secret."""
+        """Saves config data to the backend. Accepts a structure that reflects
+        core.config.config exactly (check /api/settings/load). Before writing,
+        any secret still holding the redacted placeholder (or left blank) is
+        restored from the stored config, including secrets nested in lists of
+        dicts such as MCP server api_key fields."""
         data = await request.json()
 
         changed_modules = list(data.pop("changed_modules", []))
 
-        # restore redacted-placeholder secrets from the live stored config so
-        # "****" is never written back over a real secret
         core.config.config.load()
         current = copy.deepcopy(dict(core.config.config))
         data = restore_redacted_secrets(data, current)
@@ -830,7 +817,7 @@ async def create_fastapi(channel):
         if not result:
             return api_result(success=False)
 
-        # reload any modules whose settings changed (same as /api/settings/save)
+        # Reload modules that had their settings changed
         if changed_modules:
             for module_name in changed_modules:
                 try:

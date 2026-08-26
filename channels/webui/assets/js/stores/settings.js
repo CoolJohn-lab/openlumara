@@ -150,17 +150,13 @@ SETTINGS_STORE = {
                 }
             }
 
-            this.settings = backendData;
-            this.originalCategories = JSON.parse(JSON.stringify(this.categories));
-
-            // re-fetch system prompt
-            this.systemPrompt = await simpleApiFetch("/api/chat/prompt");
+            // re-load from the server so secrets come back as **** rather than
+            // lingering in the gear modal as whatever the user typed
+            await this.load();
 
             // handle localstorage settings
             const ui = Alpine.store('ui');
             localStorage.setItem('expandReasoning', ui.expandReasoning);
-
-            this.changedModuleSettings.clear();
         } catch (err) {
             this.error = err.message || 'Failed to save settings';
         } finally {

@@ -105,6 +105,36 @@ function settingsModal() {
         },
 
         /**
+         * Dependency check for fields nested inside an object_list card.
+         * Looks at sibling fields on the same list item, not the module root.
+         */
+        checkItemDependency(itemSettings, depends) {
+            if (!depends) return true;
+            if (!itemSettings) return true;
+
+            if (typeof depends === 'object' && !Array.isArray(depends)) {
+                for (const [keyPath, expectedValue] of Object.entries(depends)) {
+                    const keys = keyPath.split('.');
+                    let currentValue = itemSettings;
+                    for (const key of keys) {
+                        if (currentValue === undefined || currentValue === null) return false;
+                        currentValue = currentValue[key]?.value;
+                    }
+                    if (currentValue !== expectedValue) return false;
+                }
+                return true;
+            }
+
+            const keys = String(depends).split('.');
+            let currentValue = itemSettings;
+            for (const key of keys) {
+                if (currentValue === undefined || currentValue === null) return false;
+                currentValue = currentValue[key]?.value;
+            }
+            return !!currentValue;
+        },
+
+        /**
          * Checks if a setting's dependency is satisfied.
          * @param {string|object} depends - Either a key path string (e.g., "some_field" or "parent.child") for truthy checks,
          *                                  or an object mapping keys to expected values (e.g., {"some_field": true, "other": "value"})

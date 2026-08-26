@@ -1,0 +1,249 @@
+        <!-- Boolean -->
+        <template x-if="setting.type === 'boolean'">
+            <div>
+                <div class="toggle-row">
+                    <label x-text="setting.title"></label>
+                    <button class="toggle" type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
+                    </button>
+                </div>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Number -->
+        <template x-if="setting.type === 'number'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <input type="number" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1" 
+                       @input="updateSetting(setting, parseFloat($event.target.value))">
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Text/URL. Hide the core Model "Name" text field; that one uses model_select. -->
+        <template x-if="
+            (setting.type === 'text' || setting.type === 'url')
+            &&
+            !(activeCategory === 'model' && setting.title === 'Name')
+        ">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <input type="text" :type="setting.type" :value="setting.value" 
+                       @input="updateSetting(setting, $event.target.value)">
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Textarea -->
+        <template x-if="setting.type === 'textarea'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <textarea :value="setting.value" rows="4" 
+                          @input="updateSetting(setting, $event.target.value)"></textarea>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Secret (redacted) -->
+        <template x-if="setting.type === 'secret'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <input type="password" autocomplete="off" :value="setting.value"
+                       @input="updateSetting(setting, $event.target.value)">
+                <span class="description secret-hint">Hidden for security. Leave as <code>****</code> (or blank) to keep the current value; type a new value to change it.</span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Select -->
+        <template x-if="setting.type === 'select'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
+                    <template x-for="[optionKey, optionLabel] in Object.entries(setting.options || {})" :key="optionKey">
+                        <option :value="optionKey" x-text="optionKey" :selected="setting.value === optionKey"></option>
+                    </template>
+                </select>
+                <span class="description" x-show="setting.options?.[setting.value]" x-html="renderMarkdown(setting.options?.[setting.value])"></span>
+            </div>
+        </template>
+
+        <!-- Array/List -->
+        <template x-if="setting.type === 'array' || setting.type === 'list'">
+            <div class="row">
+                <div class="array-field">
+                    <div class="array-header">
+                        <label x-text="setting.title"></label>
+                        <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                    </div>
+                    
+                    <div class="items" x-data="{ newItem: '' }">
+                        <template x-for="(item, index) in setting.value" :key="index">
+                            <div class="item">
+                                <input type="text" :value="item" @input="updateSetting(setting, setting.value.map((v, i) => i === index ? $event.target.value : v))">
+                                <button type="button" class="remove" 
+                                        @click="updateSetting(setting, setting.value.filter((_, i) => i !== index))"
+                                        title="Remove item">×</button>
+                            </div>
+                        </template>
+                        
+                        <template x-if="setting.value.length === 0">
+                            <span class="empty-hint">No items. Add items below.</span>
+                        </template>
+                        
+                        <div class="add-row">
+                            <input type="text" 
+                                   placeholder="Add new item..."
+                                   x-model="newItem"
+                                   @keydown.enter="
+                                       if (newItem.trim()) {
+                                           updateSetting(setting, [...setting.value, newItem.trim()]);
+                                           newItem = '';
+                                       }
+                                   "
+                                   @blur="
+                                       if (newItem.trim()) {
+                                           updateSetting(setting, [...setting.value, newItem.trim()]);
+                                           newItem = '';
+                                       }
+                                   "
+                                   >
+                            <button type="button" class="add"
+                                    @click="
+                                        if (newItem.trim()) {
+                                            updateSetting(setting, [...setting.value, newItem.trim()]);
+                                            newItem = '';
+                                        }
+                                    ">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Dict/Object -->
+        <template x-if="setting.type === 'object'">
+            <div class="row">
+                <div class="array-field">
+                    <div class="array-header">
+                        <label x-text="setting.title"></label>
+                        <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                    </div>
+                    
+                    <div class="items" x-data="{ newKey: '', newValue: '' }">
+                        <template x-for="(entry, index) in Object.entries(setting.value || {})" :key="index">
+                            <div class="item">
+                                <input type="text" :value="entry[0]" placeholder="Key"
+                                       @input="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).map(([k, v], i) => i === index ? [$event.target.value, v] : [k, v])))">
+                                <input type="text" :value="entry[1]" placeholder="Value"
+                                       @input="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).map(([k, v], i) => i === index ? [k, $event.target.value] : [k, v])))">
+                                <button type="button" class="remove" 
+                                        @click="updateSetting(setting, Object.fromEntries(Object.entries(setting.value || {}).filter(([k, v], i) => i !== index)))"
+                                        title="Remove item">×</button>
+                            </div>
+                        </template>
+                        
+                        <template x-if="!setting.value || Object.keys(setting.value).length === 0">
+                            <span class="empty-hint">No entries. Add entries below.</span>
+                        </template>
+                        
+                        <div class="add-row">
+                            <input type="text" 
+                                   placeholder="Key"
+                                   x-model="newKey"
+                                   @keydown.enter="
+                                       if (newKey.trim()) {
+                                           updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                           newKey = '';
+                                       }
+                                   ">
+                            <input type="text" 
+                                   placeholder="Value"
+                                   x-model="newValue"
+                                   @keydown.enter="
+                                       if (newKey.trim()) {
+                                           updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                           newKey = '';
+                                           newValue = '';
+                                       }
+                                   ">
+                            <button type="button" class="add"
+                                    @click="
+                                        if (newKey.trim()) {
+                                            updateSetting(setting, {...(setting.value || {}), [newKey.trim()]: newValue});
+                                            newKey = '';
+                                            newValue = '';
+                                        }
+                                    ">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!--
+            special fields can be defined in the detectFieldType() function
+            over in js/processors/settings_structure.js
+        -->
+        <!-- API url field -->
+        <template x-if="setting.type === 'api_url'">
+            <div class="row">
+                <label x-text="setting.title.toUpperCase()"></label>
+                <input type="text" :value="setting.value" 
+                       @blur="updateSetting(setting, $event.target.value); await $store.settings.saveSettings(); await $store.settings.checkApiConnection();">
+                <div class="api-status">
+                    <span :class="{'status-dot': true, 'connected': $store.settings.apiStatus, 'disconnected': !$store.settings.apiStatus}"></span>
+                    <span x-text="$store.settings.apiStatus ? 'connected' : 'not connected'"></span>
+                </div>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <template x-if="$store.settings.apiError">
+                    <p class="error" x-text="'Could not connect: ' + $store.settings.apiError"></p>
+                </template>
+            </div>
+        </template>
+
+        <!-- API key field -->
+        <template x-if="setting.type === 'api_key'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <input type="password" autocomplete="off" :value="setting.value" 
+                       @blur="updateSetting(setting, $event.target.value); await $store.settings.saveSettings(); await $store.settings.checkApiConnection();">
+                <span class="description secret-hint">Hidden for security. Leave as <code>****</code> (or blank) to keep the current value; type a new value to change it.</span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            </div>
+        </template>
+
+        <!-- Model Dropdown -->
+        <template x-if="setting.type === 'model_select'">
+            <div class="row model-setting-row">
+                <label x-text="setting.title"></label>
+                <div class="model-input-container">
+                    <template x-if="$store.settings.cachedModels && $store.settings.cachedModels.length > 0">
+                        <select :value="setting.value" @change="updateSetting(setting, $event.target.value)" class="model-select">
+                            <option value="" disabled>-- Select a model --</option>
+                            <template x-for="model in $store.settings.cachedModels" :key="model">
+                                <option :value="model" x-text="model" :selected="model === setting.value"></option>
+                            </template>
+                            <!-- Custom option if current value not in list -->
+                            <template x-if="setting.value && !$store.settings.cachedModels.find(m => m === setting.value)">
+                                <option :value="setting.value" x-text="setting.value + ' (custom)'" selected></option>
+                            </template>
+                        </select>
+                    </template>
+                    <template x-if="!$store.settings.cachedModels || $store.settings.cachedModels.length === 0">
+                        <input type="text" :value="setting.value" placeholder="Enter model name" 
+                               @input="updateSetting(setting, $event.target.value)">
+                    </template>
+                    <button type="button" @click="$store.settings.fetchModels()" class="model-refresh-btn"
+                            :title="$store.settings.cachedModels && $store.settings.cachedModels.length > 0 ? 'Refresh model list' : 'Load models from API'">
+                            {% include 'svg/reload.svg' %}
+                    </button>
+                </div>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <!-- Error message if fetch failed -->
+                <template x-if="$store.settings.modelsLoadError">
+                    <p class="error" x-text="'Could not load models: ' + $store.settings.modelsLoadError"></p>
+                </template>
+            </div>
+        </template>

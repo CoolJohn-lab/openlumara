@@ -28,27 +28,35 @@ function flattenForBackend(categories) {
     return result;
 }
 
+function flattenSettingValue(setting) {
+    if (!setting || typeof setting !== 'object') return setting;
+    if (setting.type === 'object_list') {
+        return (setting.value || []).map((item) => flattenModuleSettings(item));
+    }
+    if (setting.type === 'object' && setting.settings) {
+        return flattenModuleSettings(setting.settings);
+    }
+    return setting.value;
+}
+
 function flattenModuleSettings(settings) {
     const result = {};
-    for (const [key, setting] of Object.entries(settings)) {
-        if (setting.type === 'object' && setting.settings) {
-            result[key] = flattenModuleSettings(setting.settings);
-        } else {
-            result[key] = setting.value;
-        }
+    for (const [key, setting] of Object.entries(settings || {})) {
+        result[key] = flattenSettingValue(setting);
     }
     return result;
 }
 
 function flattenCategorySettings(settings) {
     const result = {};
-    for (const [key, setting] of Object.entries(settings)) {
-        if (setting.type === 'object' && setting.settings) {
+    for (const [key, setting] of Object.entries(settings || {})) {
+        if (setting && setting.type === 'object_list') {
+            result[key] = (setting.value || []).map((item) => flattenCategorySettings(item));
+        } else if (setting && setting.type === 'object' && setting.settings) {
             result[key] = flattenCategorySettings(setting.settings);
         } else {
-            result[key] = setting.value;
+            result[key] = setting ? setting.value : setting;
         }
     }
     return result;
 }
-
