@@ -1,11 +1,16 @@
-openai
-msgpack
-pyyaml
-json-repair
-partial-json-parser
-regex
-filetype
-pypdf2
-python-ulid
-requests
-httpx
+# Pinning policy: every dependency is bounded to a compatible release range
+# (>=known-good lower bound, <next major) for reproducible, supply-chain-safe
+# builds. Bump the lower bounds deliberately; do not leave anything unpinned.
+openai>=1.30,<2
+msgpack>=1.0,<2
+pyyaml>=6.0,<7
+json-repair>=0.25,<1
+partial-json-parser>=0.2,<1
+regex>=2023.12.25,<2027
+filetype>=1.2,<2
+# pypdf2 is deprecated/abandoned (final release 3.0.1); kept pinned because
+# core/channel.py imports `PyPDF2` - migrating to `pypdf` needs a code change.
+pypdf2==3.0.1
+python-ulid>=2.0,<3
+requests>=2.31,<3
+httpx>=0.27,<1

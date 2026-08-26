@@ -1,24 +1,21 @@
 # core
+import asyncio
+import base64
+import io
+import json
+
+# system
+# an error occurred please try again later
+import traceback
+
+import filetype
+
+# parsing stuff
+import partial_json_parser
+
 import core
 import core.commands
 
-# system
-import os
-import sys
-import time
-import json
-import asyncio
-
-# parsing stuff
-import json_repair
-import partial_json_parser
-import regex
-import base64
-import filetype
-import io
-
-# an error occurred please try again later
-import traceback
 
 def get_available_channels():
     structure = core.config.get_module_structure()
@@ -28,6 +25,7 @@ def get_available_channels():
             channels.append(name)
 
     return channels
+
 
 class Channel:
     """Base class for channels"""
@@ -42,14 +40,14 @@ class Channel:
 
     def __init__(self, manager, is_user_channel=False):
         self.manager = manager
-        self.name = core.modules.get_name(self) # shorthand alias
+        self.name = core.modules.get_name(self)  # shorthand alias
         self.commands = core.commands.Commands(self)
         self._last_cmd_was_temporary = False
 
-        self.context = core.context.Context(self) # each channel has its own context window
+        self.context = core.context.Context(self)  # each channel has its own context window
         # the path to a channel's chat is: channel -> context -> chat
 
-        self.console_buffer = [] # used to log system messages
+        self.console_buffer = []  # used to log system messages
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
         self.turncollector = core.turns.TurnCollector()
@@ -60,7 +58,10 @@ class Channel:
         self.agentic_loop_start: int = -1
 
         # load channel config
-        self.config = core.config.ConfigManager(core.config.config, ["channels" if not is_user_channel else "user_channels", "settings", self.name])
+        self.config = core.config.ConfigManager(
+            core.config.config,
+            ["channels" if not is_user_channel else "user_channels", "settings", self.name],
+        )
 
         self._shutting_down = False
 
@@ -70,11 +71,7 @@ class Channel:
         self._queue_task = None
 
         # Persistent state for the tool renderer
-        self._tool_state = {
-            "name": None,
-            "raw_args": "",
-            "keys_state": {}
-        }
+        self._tool_state = {"name": None, "raw_args": "", "keys_state": {}}
 
     async def init(self):
         """async class constructor. gets called by manager._load_channels()"""
@@ -92,7 +89,6 @@ class Channel:
         called when the entire framework has fully initialized
         (when the message "[CORE] Startup complete" shows up)
         """
-        pass
 
     async def _shutdown(self):
         """internal shutdown function. gets called by the manager before on_shutdown()"""
@@ -107,7 +103,6 @@ class Channel:
 
     async def on_shutdown(self):
         """overridable method that runs on the channel's shutdown"""
-        pass
 
     async def _push_consumer(self):
         """Consumes messages from the queue and triggers on_push sequentially"""
@@ -121,7 +116,7 @@ class Channel:
             except Exception as e:
                 # Always log full traceback for easier debugging
                 self.log(self.name, traceback.format_exc())
-                self.log(self.name, f"error in message consumer: {str(e)}")
+                self.log(self.name, f"error in message consumer: {e!s}")
                 await asyncio.sleep(0.5)
 
     def log(self, category: str, message: str):
@@ -133,7 +128,9 @@ class Channel:
         try:
             self.manager.log(category, message)
         except Exception as e:
-            print(f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}")
+            print(
+                f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}"
+            )
 
     def log_error(self, msg: str, e: Exception):
         """console log but with extra spice for errors"""
@@ -149,7 +146,6 @@ class Channel:
         that were broadcasted by self.log()
         for a simple cli channel, we just print()
         """
-        pass
 
     async def _start_push_queue(self):
         if not hasattr(self, "on_push"):
@@ -163,14 +159,12 @@ class Channel:
 
         to send content to the user without having to prompt the AI
         """
-        pass
 
     async def on_install(self):
         """Overridable method that triggers when the auto-installer installs the dependencies for a channel"""
-        pass
+
     async def on_uninstall(self):
         """Overridable method that triggers when the auto-installer uninstalls the dependencies for a channel"""
-        pass
 
     async def push(self, message):
         """
@@ -220,7 +214,7 @@ class Channel:
 
         if isinstance(content, str):
             return content
-        elif isinstance(content, list):
+        if isinstance(content, list):
             # it's multimodal
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
@@ -265,12 +259,17 @@ class Channel:
         # otherwise add the text message as a text block
         if message:
             content_blocks.append({"type": "text", "text": message})
-            filenames.append("") # so that indexes match
+            filenames.append("")  # so that indexes match
 
         format_map = {
-            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
-            "audio/ogg": "ogg", "audio/flac": "flac",
-            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
+            "audio/wav": "wav",
+            "audio/mp3": "mp3",
+            "audio/mpeg": "mp3",
+            "audio/ogg": "ogg",
+            "audio/flac": "flac",
+            "audio/webm": "webm",
+            "audio/mp4": "mp4",
+            "audio/aac": "mp4",
         }
 
         message_dict = {"role": "user"}
@@ -284,24 +283,23 @@ class Channel:
 
             if mime_type.startswith("image/"):
                 b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{b64}"}
-                })
+                content_blocks.append(
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}}
+                )
 
             elif mime_type.startswith("audio/"):
                 b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "input_audio",
-                    "input_audio": {
-                        "data": b64,
-                        "format": format_map.get(mime_type, "wav")
+                content_blocks.append(
+                    {
+                        "type": "input_audio",
+                        "input_audio": {"data": b64, "format": format_map.get(mime_type, "wav")},
                     }
-                })
+                )
 
             elif mime_type == "application/pdf":
                 try:
                     from PyPDF2 import PdfReader
+
                     reader = PdfReader(io.BytesIO(file_data))
                     text_parts = []
                     for page in reader.pages:
@@ -309,27 +307,24 @@ class Channel:
                         if page_text:
                             text_parts.append(page_text)
                     combined = "\n\n".join(text_parts)
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
-                    })
+                    content_blocks.append(
+                        {"type": "text", "text": f"File: {filename}\n\n```pdf\n{combined}\n```"}
+                    )
                 except Exception as e:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Error extracting PDF '{filename}': {e}]"
-                    })
+                    content_blocks.append(
+                        {"type": "text", "text": f"[Error extracting PDF '{filename}': {e}]"}
+                    )
 
             else:
                 try:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
-                    })
+                    content_blocks.append(
+                        {
+                            "type": "text",
+                            "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```",
+                        }
+                    )
                 except UnicodeDecodeError:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Binary file: {filename}]"
-                    })
+                    content_blocks.append({"type": "text", "text": f"[Binary file: {filename}]"})
 
             filenames.append(filename)
 
@@ -366,7 +361,7 @@ class Channel:
         if role == "assistant":
             if message.get("tool_calls"):
                 for tool_call in message.get("tool_calls"):
-                    formatted += self.tc_manager.display_call(tool_call)+"\n"
+                    formatted += self.tc_manager.display_call(tool_call) + "\n"
 
                 formatted += "\n\n"
 
@@ -391,7 +386,7 @@ class Channel:
             data = partial_json_parser.loads(args_str, allow_partial=partial_json_parser.Allow.ALL)
             if not isinstance(data, dict):
                 data = {}
-        except Exception as e:
+        except Exception:
             data = {}
 
         # 3. Delta comparison
@@ -405,7 +400,7 @@ class Channel:
                     delta += val_str
                 self._tool_state["keys_state"][key] = val_str
             elif val_str != prev_val:
-                delta += val_str[len(prev_val):] if val_str.startswith(prev_val) else val_str
+                delta += val_str[len(prev_val) :] if val_str.startswith(prev_val) else val_str
                 self._tool_state["keys_state"][key] = val_str
 
         self._tool_state["raw_args"] = args_str
@@ -414,7 +409,7 @@ class Channel:
     # -------------------------
     # The actual sending logic
     # -------------------------
-    async def _send_preprocess(self, message: str, files: list = None, commands_authorized = False):
+    async def _send_preprocess(self, message: str, files: list = None, commands_authorized=False):
         """
         internal helper function so that send() and send_stream()
         both use many of the same code paths and i don't have to keep maintaining each one individually
@@ -431,13 +426,17 @@ class Channel:
 
         if isinstance(user_message, str):
             # process any commands
-            is_cmd = user_message.strip().lower().startswith(
-                core.config.get("core", "cmd_prefix").strip().lower()
+            is_cmd = (
+                user_message.strip()
+                .lower()
+                .startswith(core.config.get("core", "cmd_prefix").strip().lower())
             )
 
             if is_cmd:
                 try:
-                    cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
+                    cmd_response = await self.commands.process_input(
+                        user_message, authorized=commands_authorized
+                    )
                 except Exception as e:
                     self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
                     # no need to add a message to context here, as process_input() already does that
@@ -446,8 +445,7 @@ class Channel:
                 if cmd_response:
                     # process_input already adds to context
                     return {"type": "cmd_response", "content": str(cmd_response), "is_cmd": True}
-                else:
-                    return {"type": "blank"}
+                return {"type": "blank"}
 
             # apply any on_user_message() hooks
             for module_name, module in self.manager.modules.items():
@@ -458,12 +456,17 @@ class Channel:
                         else:
                             usr_msg_result = module.on_user_message(user_message)
                     except Exception as e:
-                        self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+                        self.log(
+                            "module error",
+                            f"{module_name}: in on_user_message(): {core.detail_error(e)}",
+                        )
 
                     if usr_msg_result is False:
-                        await self.context.chat.messages.add({"role": "user", "content": user_message})
+                        await self.context.chat.messages.add(
+                            {"role": "user", "content": user_message}
+                        )
                         return {"type": "module_intercept"}
-                    elif usr_msg_result is not None:
+                    if usr_msg_result is not None:
                         user_message = usr_msg_result
 
         # apply multimodal content if applicable
@@ -472,7 +475,10 @@ class Channel:
         # and add the user's message to context
         add_success = await self.context.chat.messages.add(user_message_processed)
         if not add_success:
-            return {"type": "error", "content": "Unknown error while adding user message to context"}
+            return {
+                "type": "error",
+                "content": "Unknown error while adding user message to context",
+            }
 
         # reconnect if needed
         result = await self.manager.API.attempt_connect()
@@ -483,7 +489,11 @@ class Channel:
         context = await self.context.get(system_prompt=True, end_prompt=True)
 
         # and return the results for use in send() and send_stream()
-        return {"type": "ready", "user_message": user_message_processed.get("content"), "context": context}
+        return {
+            "type": "ready",
+            "user_message": user_message_processed.get("content"),
+            "context": context,
+        }
 
     async def _send_postprocess(self, assistant_message):
         await self.context.chat.messages.add(assistant_message)
@@ -497,9 +507,12 @@ class Channel:
                     else:
                         module.on_assistant_message(assistant_message.get("content", ""))
                 except Exception as e:
-                    self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
+                    self.log(
+                        "module error",
+                        f"{module_name}: in on_assistant_message(): {core.detail_error(e)}",
+                    )
 
-    def _build_final_assistant_message(self, final_content = None, final_reasoning = None):
+    def _build_final_assistant_message(self, final_content=None, final_reasoning=None):
         # python has a bug where, if you pass a default value in the function definition,
         # all calls to the function then share the reference to that value,
         # which, well, pollutes future calls...
@@ -509,10 +522,7 @@ class Channel:
         if final_reasoning is None:
             final_reasoning = []
 
-        assistant_message = {
-            "role": "assistant",
-            "content": "".join(final_content)
-        }
+        assistant_message = {"role": "assistant", "content": "".join(final_content)}
 
         if final_reasoning:
             assistant_message["reasoning_content"] = "".join(final_reasoning)
@@ -539,9 +549,9 @@ class Channel:
             case "cmd_response":
                 return self.format_message({"role": "assistant", "content": processed["content"]})
             case "blank":
-                return
+                return None
             case "module_intercept":
-                return
+                return None
             case "error":
                 return {"role": "assistant", "content": processed["content"]}
 
@@ -560,12 +570,13 @@ class Channel:
         tool_calls = assistant_message.get("tool_calls")
         if tool_calls:
             # process() does all the toolcalling, but it also returns the raw toolcall stream for our own use
-            async for sub_token in self.tc_manager.process(
-                assistant_message,
-                push=True
-            ):
+            async for sub_token in self.tc_manager.process(assistant_message, push=True):
+                if sub_token.get("type") == "final":
+                    # persist the final post-tool-call assistant reply to context
+                    # (the streaming path does this too; without it the answer
+                    # after a tool chain is never saved to history)
+                    await self.context.chat.messages.add(sub_token.get("content"))
                 # push handles all the output
-                pass
 
             return None
 
@@ -599,22 +610,28 @@ class Channel:
                 yield await self.throw_stream_error(processed["content"])
                 return
 
-        user_message = processed.get("user_message") #alias for readability
+        user_message = processed.get("user_message")  # alias for readability
 
         # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
         yield {"type": "user_message", "content": user_message}
-        
+
         # estimate tokens used for user message
         user_message_token_estimation = 0
         try:
             user_message_token_estimation = await self.context.get_total_tokens()
         except Exception as e:
             self.log_error("Error while trying to estimate token use", e)
-            yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
+            yield await self.throw_stream_error(
+                f"Error while trying to estimate token use: {core.detail_error(e)}"
+            )
             return
 
         # yield so it updates throughout all channels that display token count
-        yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
+        yield {
+            "type": "token_usage",
+            "content": user_message_token_estimation,
+            "source": "estimation",
+        }
 
         final_content = []
         final_reasoning = []
@@ -626,7 +643,9 @@ class Channel:
         try:
             stream = self.manager.API.send_stream(processed.get("context"))
         except Exception as e:
-            yield await self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
+            yield await self.throw_stream_error(
+                f"Error while starting stream: {core.detail_error(e)}"
+            )
             return
 
         try:
@@ -638,7 +657,9 @@ class Channel:
                     self.log(self.name, f"Error: {token.get('content')}")
 
                     # add the content that has been accumulated so far, so that we don't lose incomplete messages
-                    assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+                    assistant_message = self._build_final_assistant_message(
+                        final_content, final_reasoning
+                    )
                     await self.context.chat.messages.add(assistant_message)
 
                     yield await self.throw_stream_error(token.get("content"))
@@ -657,7 +678,9 @@ class Channel:
                     pass
                 elif token_type == "tool_calls":
                     tool_calls_occurred = True
-                    toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
+                    toolcall_request = await self.tc_manager._build_recursive_request(
+                        token, final_content, final_reasoning
+                    )
 
                     # the AI has decided to call a tool, so now we start the recursive toolcall loop (aka agentic loop)
                     # AI calls tool -> gets response -> decides whether it needs to call more tools -> does so if needed -> gets response -> rinse and repeat
@@ -698,7 +721,11 @@ class Channel:
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.get_total_tokens(), "source": "estimation"}
+            yield {
+                "type": "token_usage",
+                "content": await self.context.get_total_tokens(),
+                "source": "estimation",
+            }
 
         # and finally, once the stream has completed, add the finished assistant message to context
         if tool_calls_occurred:
@@ -710,15 +737,18 @@ class Channel:
         assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
         await self._send_postprocess(assistant_message)
 
-    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None, show_indicators=True):
+    async def format_stream_for_text(
+        self, stream, chunk_size=None, use_markdown=True, strings: dict = None, show_indicators=True
+    ):
         """
         Formats a stream of turn segments into text deltas for text-based channels.
         """
+
         def text_to_token(text):
             return {"type": "formatted", "content": text}
 
         show_reasoning = self.config.get("show_reasoning")
-        
+
         if not strings:
             if use_markdown:
                 strings = {
@@ -726,29 +756,29 @@ class Channel:
                     "thinking_newline": "\n> ",
                     "conclusion_header": "",
                     "separator": "",
-                    "tool_call_header": "🔧 calling tool *{tool_name}*"
+                    "tool_call_header": "🔧 calling tool *{tool_name}*",
                 }
             else:
                 strings = {
                     "thinking_header": "Thinking:",
                     "thinking_newline": "\n-> ",
                     "conclusion_header": "",
-                    "separator": "-"*8,
-                    "tool_call_header": "🔧 calling tool {tool_name}"
+                    "separator": "-" * 8,
+                    "tool_call_header": "🔧 calling tool {tool_name}",
                 }
 
         first_turn = True
         last_turn_type = None
         currently_reasoning = False
         shown_reasoning_indicator = False
-        
+
         # Per-tool-call tracking: {tool_id: {key: formatted_value}}
         last_tool_state = {}
         last_content = {}
-        
+
         # track characters for chunk boundaries
         char_counter = 0
-        
+
         async def check_chunk_boundary():
             nonlocal char_counter
             if chunk_size and char_counter >= chunk_size:
@@ -762,16 +792,16 @@ class Channel:
 
             if token.get("type") != "turn":
                 continue
-            
+
             segment = token.get("content")
             if not segment:
                 continue
-            
+
             segment_type = segment.get("type")
-            
+
             if segment.get("role") != "assistant":
                 continue
-            
+
             if segment_type != last_turn_type:
                 if first_turn:
                     first_turn = False
@@ -780,11 +810,11 @@ class Channel:
                         # create a new chunk if needed
                         async for _ in check_chunk_boundary():
                             yield _
-                        yield text_to_token("\n"+strings["separator"]+"\n")
-                        char_counter += len("\n"+strings["separator"]+"\n")
+                        yield text_to_token("\n" + strings["separator"] + "\n")
+                        char_counter += len("\n" + strings["separator"] + "\n")
 
                 last_content = {}
-                
+
                 if segment_type == "reasoning" and show_reasoning:
                     currently_reasoning = True
                     # create a new chunk if needed
@@ -812,7 +842,7 @@ class Channel:
             if segment_type == "reasoning":
                 if show_reasoning:
                     current = segment.get("reasoning_content") or ""
-                    delta = current[len(last_content.get("reasoning", "")):]
+                    delta = current[len(last_content.get("reasoning", "")) :]
                     if delta:
                         # create a new chunk if needed
                         async for _ in check_chunk_boundary():
@@ -856,19 +886,19 @@ class Channel:
 
             elif segment_type == "tool_calls":
                 tool_calls = segment.get("tool_calls") or []
-                
+
                 for tc in tool_calls:
                     tc_id = tc.get("id", "")
                     if not tc_id:
                         continue
-                        
+
                     tool_name = tc.get("function", {}).get("name", "unknown")
                     args_str = tc.get("function", {}).get("arguments", "")
-                    
+
                     # Check if we need to print the tool header (new tool or name changed)
                     prev_state = last_tool_state.get(tc_id, {})
                     prev_name = prev_state.get("_name")
-                    
+
                     if prev_name != tool_name:
                         # New tool or name changed - print header
                         header = strings["tool_call_header"].format(tool_name=tool_name)
@@ -879,27 +909,33 @@ class Channel:
                         char_counter += len("\n")
                         yield text_to_token(header)
                         char_counter += len(header)
-                    
+
                     # Parse the current arguments as partial JSON
                     try:
-                        current_args = partial_json_parser.loads(args_str, allow_partial=partial_json_parser.Allow.ALL)
+                        current_args = partial_json_parser.loads(
+                            args_str, allow_partial=partial_json_parser.Allow.ALL
+                        )
                         if not isinstance(current_args, dict):
                             current_args = {}
                     except Exception:
                         current_args = {}
-                    
+
                     # Get previous parsed args
                     prev_args = prev_state.get("_args", {})
-                    
+
                     # Compare keys and yield deltas
                     all_keys = set(list(prev_args.keys()) + list(current_args.keys()))
                     for key in all_keys:
                         prev_val = prev_args.get(key)
                         current_val = current_args.get(key)
-                        
+
                         if prev_val is None:
                             # New key - print the whole key: value
-                            val_str = json.dumps(current_val) if isinstance(current_val, (dict, list)) else str(current_val)
+                            val_str = (
+                                json.dumps(current_val)
+                                if isinstance(current_val, (dict, list))
+                                else str(current_val)
+                            )
                             # create a new chunk if needed
                             async for _ in check_chunk_boundary():
                                 yield _
@@ -917,13 +953,21 @@ class Channel:
                             pass
                         else:
                             # Key exists in both - check for value change
-                            prev_val_str = json.dumps(prev_val) if isinstance(prev_val, (dict, list)) else str(prev_val)
-                            current_val_str = json.dumps(current_val) if isinstance(current_val, (dict, list)) else str(current_val)
-                            
+                            prev_val_str = (
+                                json.dumps(prev_val)
+                                if isinstance(prev_val, (dict, list))
+                                else str(prev_val)
+                            )
+                            current_val_str = (
+                                json.dumps(current_val)
+                                if isinstance(current_val, (dict, list))
+                                else str(current_val)
+                            )
+
                             if prev_val_str != current_val_str:
                                 # Value changed - yield the delta
                                 if current_val_str.startswith(prev_val_str):
-                                    delta = current_val_str[len(prev_val_str):]
+                                    delta = current_val_str[len(prev_val_str) :]
                                 else:
                                     delta = current_val_str
                                 if delta:
@@ -932,12 +976,9 @@ class Channel:
                                         yield _
                                     yield text_to_token(delta)
                                     char_counter += len(delta)
-                    
+
                     # Update state
-                    last_tool_state[tc_id] = {
-                        "_name": tool_name,
-                        "_args": current_args
-                    }
+                    last_tool_state[tc_id] = {"_name": tool_name, "_args": current_args}
 
             last_turn_type = segment_type
 
