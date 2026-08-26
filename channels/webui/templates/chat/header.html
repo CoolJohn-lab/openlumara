@@ -22,6 +22,9 @@
         <button class="btn" id="settings-btn" title="Settings (Ctrl+S)" @click="await $store.ui.openModal('settings')">
             {% include 'svg/gear.svg' %}
         </button>
+        <button class="btn" id="config-page-btn" title="Configuration page" @click="window.location.href='/config'">
+            {% include 'svg/wrench.svg' %}
+        </button>
         <button class="btn" title="Export chat" @click="$store.chat.export()">
             {% include 'svg/download.svg' %}
         </button>
