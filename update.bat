@@ -4,6 +4,17 @@ setlocal enabledelayedexpansion
 :: Switch to the directory where this .bat file is located
 cd /d "%~dp0"
 
+:: detect a python interpreter for creating the virtual environment
+set PYTHON_BIN=
+where python >nul 2>nul && set PYTHON_BIN=python
+if not defined PYTHON_BIN (
+    where py >nul 2>nul && set PYTHON_BIN=py
+)
+if not defined PYTHON_BIN (
+    echo error: no python interpreter found ^(tried python and py^). aborting.
+    exit /b 1
+)
+
 :: 1. Smart auto-update
 echo checking for updates...
 git fetch origin >nul 2>nul
@@ -19,7 +30,10 @@ if %errorlevel% equ 0 (
         echo no upstream configured, skipping update check.
     ) else if "!LOCAL!" NEQ "!REMOTE!" (
         echo updates available! pulling changes...
-        git pull
+        :: --ff-only refuses to merge if the remote diverged, so we never
+        :: auto-execute a rewritten/force-pushed history
+        git pull --ff-only
+        if errorlevel 1 echo warning: remote is not a fast-forward of local; refusing to pull. resolve manually.
     ) else (
         echo already up to date.
     )

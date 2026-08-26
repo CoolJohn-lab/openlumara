@@ -1,5 +1,7 @@
-import core
 import json
+
+import core
+
 
 class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
@@ -7,16 +9,16 @@ class Characters(core.module.Module):
     settings = {
         "insert_system_prompt": {
             "default": True,
-            "description": "Put the list of stored characters into the system prompt so that the AI always knows what characters it can switch to"
+            "description": "Put the list of stored characters into the system prompt so that the AI always knows what characters it can switch to",
         },
         "disable_agent_prompts_when_character_active": {
             "default": True,
-            "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
+            "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants.",
         },
         "use_writing_style": {
             "description": "Whether to use the writing style defined by the `writing style` module for characters. This will add that module's prompt to the character prompt even if agent prompts are disabled, making all your characters use your preferred writing style setup",
-            "default": True
-        }
+            "default": True,
+        },
     }
 
     # since we use a tool based approach, and char card v2's naming is confusing for an AI,
@@ -27,7 +29,7 @@ class Characters(core.module.Module):
         "personality": "short_summary",
         "scenario": "scenario",
         "first_mes": "first_message",
-        "mes_example": "example_conversation"
+        "mes_example": "example_conversation",
     }
 
     header = "Character"
@@ -54,12 +56,12 @@ class Characters(core.module.Module):
             category = character.get("category", None)
 
             if category:
-                if category not in sorted_by_cat.keys():
+                if category not in sorted_by_cat:
                     sorted_by_cat[category] = []
 
                 sorted_by_cat[category].append(character_name)
             else:
-                if "unsorted" not in sorted_by_cat.keys():
+                if "unsorted" not in sorted_by_cat:
                     sorted_by_cat["unsorted"] = []
 
                 sorted_by_cat["unsorted"].append(character_name)
@@ -69,7 +71,7 @@ class Characters(core.module.Module):
             if not category:
                 # autoremove empty categories
                 if category_name in self.characters.keys():
-                    del(self.characters[category_name])
+                    del self.characters[category_name]
 
             characters = ", ".join(category)
             char_list.append(f"{category_name}: {characters}")
@@ -80,11 +82,14 @@ class Characters(core.module.Module):
     async def get_all(self):
         return self.result(await self._list_characters())
 
-    @core.module.command("character", help={
-        "": "show current character",
-        "<name>": "switch to character <name>",
-        "reset": "switch to default AI assistant character"
-    })
+    @core.module.command(
+        "character",
+        help={
+            "": "show current character",
+            "<name>": "switch to character <name>",
+            "reset": "switch to default AI assistant character",
+        },
+    )
     async def cmd_switch(self, args: list):
         name = " ".join(args)
         if not name:
@@ -92,12 +97,11 @@ class Characters(core.module.Module):
             self.active = True
             if char:
                 return f"currently active character: {char}"
-            else:
-                return "please provide a character name."
-        elif name in("reset", "default"):
-                self.channel.context.chat.get("metadata")["character"] = "character"
-                self.active = False
-                return "character has been reset to default"
+            return "please provide a character name."
+        if name in ("reset", "default"):
+            self.channel.context.chat.get("metadata")["character"] = "character"
+            self.active = False
+            return "character has been reset to default"
 
         character = self._find_character(name)
         if not character:
@@ -111,11 +115,15 @@ class Characters(core.module.Module):
     async def on_system_prompt(self):
         curr_char = self.channel.context.chat.get("metadata").get("character")
 
-        tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
-            core.config.get("model", {}).get("use_tools") and
-            self.config.get("insert_system_prompt") and
-            not curr_char
-        ) else ""
+        tool_text = (
+            f"Characters available to switch yourself to:\n{await self._list_characters()}"
+            if (
+                core.config.get("model", {}).get("use_tools")
+                and self.config.get("insert_system_prompt")
+                and not curr_char
+            )
+            else ""
+        )
 
         if not curr_char:
             return tool_text or None
@@ -132,7 +140,7 @@ class Characters(core.module.Module):
         first_msg = None
         if char_data:
             char_profile = char_data.get("description")
-            char_scenario = char_data.get('scenario')
+            char_scenario = char_data.get("scenario")
             first_msg = char_data.get("first_mes")
         else:
             # check if this is the legacy openlumara format or character spec V1,
@@ -180,7 +188,9 @@ class Characters(core.module.Module):
             if len(await self.channel.context.chat.messages.get()) == 0:
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
-                await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
+                await self.channel.context.chat.messages.add(
+                    {"role": "assistant", "content": first_msg}
+                )
 
         return char_text
 
@@ -210,12 +220,12 @@ class Characters(core.module.Module):
             # default back to legacy openlumara character format
             char_identity = char.get("identity")
             if not char_identity:
-                return self.result("character data not found and auto conversion of legacy character format failed", False)
+                return self.result(
+                    "character data not found and auto conversion of legacy character format failed",
+                    False,
+                )
 
-            char_data = {
-                "name": self._find_char_name(name),
-                "description": char.get("identity")
-            }
+            char_data = {"name": self._find_char_name(name), "description": char.get("identity")}
 
         self.channel.context.chat.get("metadata")["character"] = char_data.get("name")
         self.active = True
@@ -226,11 +236,15 @@ class Characters(core.module.Module):
             # bypass the usual tool response flow and instead send the first message as a push message
             first_msg = self._replace_tags(name, first_msg)
             await self.channel.push({"role": "assistant", "content": first_msg})
-            await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
+            await self.channel.context.chat.messages.add(
+                {"role": "assistant", "content": first_msg}
+            )
             return None
 
-        return self.result(f"Switch successful. Write your response as the character's first message.")
-    
+        return self.result(
+            "Switch successful. Write your response as the character's first message."
+        )
+
     async def switch_to_default(self):
         """Switches you back to your default identity."""
         self.channel.context.chat.get("metadata")["character"] = ""
@@ -293,7 +307,7 @@ class Characters(core.module.Module):
             "<BOT>": name,
             "{{user}}": user_name,
             "{user}": user_name,
-            "<USER>": user_name
+            "<USER>": user_name,
         }
 
         for word, replacement in replacement_map.items():
@@ -301,7 +315,17 @@ class Characters(core.module.Module):
 
         return character
 
-    async def add(self, name: str, profile: str, short_summary: str, scenario: str, category: str, tags: list = None, first_message: str = "", post_history_instructions: str = ""):
+    async def add(
+        self,
+        name: str,
+        profile: str,
+        short_summary: str,
+        scenario: str,
+        category: str,
+        tags: list = None,
+        first_message: str = "",
+        post_history_instructions: str = "",
+    ):
         """
         Adds a new character to your character storage.
 
@@ -337,22 +361,31 @@ class Characters(core.module.Module):
                 "personality": short_summary,
                 "scenario": scenario,
                 "first_mes": first_message,
-                "mes_example": "", # why
+                "mes_example": "",  # why
                 "tags": tags,
-
-                "creator_notes": "", # not needed for openlumara
-                "system_prompt": "", # not needed for openlumara
+                "creator_notes": "",  # not needed for openlumara
+                "system_prompt": "",  # not needed for openlumara
                 "post_history_instructions": post_history_instructions,
-                "alternate_greetings": [], # no
+                "alternate_greetings": [],  # no
                 "creator": self.user_profile.get("name", "OpenLumara User"),
                 "character_version": "1.0",
-                "extensions": {}
-            }
+                "extensions": {},
+            },
         }
         self.characters.save()
         return self.result("character added")
 
-    async def edit(self, name: str, profile: str = None, short_summary: str = None, scenario: str = None, category: str = None, tags: list = None, first_message: str = None, post_history_instructions: str = None):
+    async def edit(
+        self,
+        name: str,
+        profile: str = None,
+        short_summary: str = None,
+        scenario: str = None,
+        category: str = None,
+        tags: list = None,
+        first_message: str = None,
+        post_history_instructions: str = None,
+    ):
         """
         Edits an existing character. All fields except name are optional.
 
@@ -376,30 +409,40 @@ class Characters(core.module.Module):
         if not char_data:
             return self.result("character data doesn't exist!", False)
 
-        ver_increment = float(char.get("character_version", 1.0))+0.1
+        # the version lives inside the nested "data" object, not at the top level
+        ver_increment = float(char_data.get("character_version", 1.0)) + 0.1
 
         # we're using `is not None` because we need to retain the ability
         # to set stuff to blank strings
         self.characters[name] = {
             "spec": "chara_card_v2",
             "spec_version": "2.0",
-            "category": category,
+            # only overwrite the category when explicitly provided, so editing
+            # any other field doesn't wipe an existing category
+            "category": category if category is not None else char.get("category"),
             "data": {
                 "name": name,
                 "description": profile if profile is not None else char_data.get("description"),
-                "personality": short_summary if short_summary is not None else char_data.get("personality"),
+                "personality": short_summary
+                if short_summary is not None
+                else char_data.get("personality"),
                 "scenario": scenario if scenario is not None else char_data.get("scenario"),
-                "first_mes": first_message if first_message is not None else char_data.get("first_mes"),
-                "mes_example": "", # why
+                "first_mes": first_message
+                if first_message is not None
+                else char_data.get("first_mes"),
+                "mes_example": "",  # why
                 "tags": tags if tags is not None else char_data.get("tags"),
-                "creator_notes": "", # not needed for openlumara
-                "system_prompt": "", # not needed for openlumara
-                "post_history_instructions": post_history_instructions if post_history_instructions is not None else char_data.get("post_history_instructions"),
-                "alternate_greetings": [], # no
-                "creator": char_data.get("creator") or self.user_profile.get("name", "OpenLumara User"),
+                "creator_notes": "",  # not needed for openlumara
+                "system_prompt": "",  # not needed for openlumara
+                "post_history_instructions": post_history_instructions
+                if post_history_instructions is not None
+                else char_data.get("post_history_instructions"),
+                "alternate_greetings": [],  # no
+                "creator": char_data.get("creator")
+                or self.user_profile.get("name", "OpenLumara User"),
                 "character_version": ver_increment,
-                "extensions": {}
-            }
+                "extensions": {},
+            },
         }
         self.characters.save()
         return self.result("character edited")
@@ -451,16 +494,14 @@ class Characters(core.module.Module):
                 return self.result("error: character card did not have a data field", success=False)
 
             # if so, convert it to V2
-            char_obj = {
-                "spec": "chara_card_v2",
-                "spec_version": "2.0",
-                "data": char_obj
-            }
+            char_obj = {"spec": "chara_card_v2", "spec_version": "2.0", "data": char_obj}
 
         char_name = char_data.get("name")
 
         if not char_name:
-            return self.result("error: failed to extract character name from character data", success=False)
+            return self.result(
+                "error: failed to extract character name from character data", success=False
+            )
 
         # add it to storage
         self.characters[char_name] = char_obj

@@ -1,5 +1,7 @@
-import core
 import random
+
+import core
+
 
 class Lists(core.module.Module):
     """
@@ -9,12 +11,9 @@ class Lists(core.module.Module):
     settings = {
         "insert_system_prompt": {
             "description": "Whether to put pinned lists in the system prompt. This will make your AI aware of pinned lists and their content at all times! So you can simply ask your AI to pin one of your lists, and then it will always know what's in it. Careful though, this can blow up context size fast, depending on the list!",
-            "default": True
+            "default": True,
         },
-        "max_pinned_lists": {
-            "default": 10,
-            "depends": "insert_system_prompt"
-        }
+        "max_pinned_lists": {"default": 10, "depends": "insert_system_prompt"},
     }
 
     async def on_ready(self):
@@ -34,9 +33,12 @@ class Lists(core.module.Module):
                     break
 
                 count += 1
-                if not lst.get("items"): continue
-                if lst.get("pinned"): pinned_by_cat.setdefault(cat, []).append((name, lst["items"]))
-                else: unpinned_by_cat.setdefault(cat, []).append(name)
+                if not lst.get("items"):
+                    continue
+                if lst.get("pinned"):
+                    pinned_by_cat.setdefault(cat, []).append((name, lst["items"]))
+                else:
+                    unpinned_by_cat.setdefault(cat, []).append(name)
 
         for cat, items in pinned_by_cat.items():
             output += f"## {cat}\n"
@@ -52,7 +54,7 @@ class Lists(core.module.Module):
     def _verify_target(self, category, list_name):
         if category not in self.data:
             return False
-            
+
         if list_name not in self.data.get(category, {}):
             return False
 
@@ -84,25 +86,25 @@ class Lists(core.module.Module):
 
         return self.result("list created!")
 
-#     async def rename(self, name: str, new_name: str):
-#         target_list = self._find_list(list_name)
-#         if target_list == None:
-#             return self.result("that list doesn't exist", False)
-#
-#         del(target_list)
-#         self.data.save()
-#
-#         return self.result("list deleted!")
+    #     async def rename(self, name: str, new_name: str):
+    #         target_list = self._find_list(list_name)
+    #         if target_list == None:
+    #             return self.result("that list doesn't exist", False)
+    #
+    #         del(target_list)
+    #         self.data.save()
+    #
+    #         return self.result("list deleted!")
 
     async def delete(self, category: str, list_name: str):
         """Deletes a list. ONLY use if user explicitly asks."""
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
-        del(self.data[category][list_name])
+        del self.data[category][list_name]
         # check if the category still contains any lists. if not, delete the category itself
         if not self.data[category]:
-            del(self.data[category])
+            del self.data[category]
 
         self.data.save()
 
@@ -117,6 +119,7 @@ class Lists(core.module.Module):
         self.data.save()
 
         return self.result("list pinned!")
+
     async def unpin(self, category: str, list_name: str):
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
@@ -167,7 +170,9 @@ class Lists(core.module.Module):
 
         return self.result("list item added!")
 
-    async def edit_item(self, category: str, list_name: str, item_starts_with: str, item_content: str):
+    async def edit_item(
+        self, category: str, list_name: str, item_starts_with: str, item_content: str
+    ):
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
@@ -201,4 +206,8 @@ class Lists(core.module.Module):
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
-        return self.result(random.choice(self.data[category][list_name]["items"]))
+        items = self.data[category][list_name]["items"]
+        if not items:
+            return self.result("that list is empty")
+
+        return self.result(random.choice(items))

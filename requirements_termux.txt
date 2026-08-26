@@ -1,18 +1,21 @@
-openai
-tiktoken
-prompt_toolkit
-msgpack
-pyyaml
-json-repair
-aiofiles
-python-ulid
-requests
-jinja2
-itsdangerous
-fastapi
-uvicorn
-websockets
-python-multipart
-beautifulsoup4
-discord.py
-python-telegram-bot
+# Pinning policy: every dependency is bounded to a compatible release range
+# (>=known-good lower bound, <next major) for reproducible, supply-chain-safe
+# builds. Bump the lower bounds deliberately; do not leave anything unpinned.
+openai>=1.30,<2
+tiktoken>=0.7,<1
+prompt_toolkit>=3.0,<4
+msgpack>=1.0,<2
+pyyaml>=6.0,<7
+json-repair>=0.25,<1
+aiofiles>=23.0,<25
+python-ulid>=2.0,<3
+requests>=2.31,<3
+jinja2>=3.1,<4
+itsdangerous>=2.1,<3
+fastapi>=0.110,<1
+uvicorn>=0.29,<1
+websockets>=12.0,<15
+python-multipart>=0.0.9,<1
+beautifulsoup4>=4.12,<5
+discord.py>=2.3,<3
+python-telegram-bot>=21.0,<23

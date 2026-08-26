@@ -1,7 +1,9 @@
-import core
-import datetime
-import ulid
 import asyncio
+import datetime
+
+import core
+import ulid
+
 
 class Calendar(core.module.Module):
     """Lets your AI manage a calendar for you"""
@@ -11,38 +13,45 @@ class Calendar(core.module.Module):
     settings = {
         "insert_system_prompt": {
             "description": "Whether to add the calendar events within your configured range (defined below) to the system prompt. This will make your AI aware of your upcoming appointments at all times!",
-            "default": True
+            "default": True,
         },
         "range": {
             "description": "The range of days relative to today that you want the AI to see the events of",
             "default": 7,
-            "depends": "insert_system_prompt"
+            "depends": "insert_system_prompt",
         },
         "include_past_events": {
             "description": "Whether or not to make the AI aware of calendar events that have already passed. Many local AI's don't handle this very well, so it's recommended to leave this off, or they will start to remind you of appointments that have already happened. It's still included for posterity, in case you're using a model that handles this better.",
             "default": False,
-            "depends": "insert_system_prompt"
+            "depends": "insert_system_prompt",
         },
         "notifications": {
             "description": "Whether to receive notifications about upcoming events",
-            "default": True
+            "default": True,
         },
         "notification_channel": {
             "type": "select",
             "default": "webui",
             "description": "Which channel to send calendar notifications to",
-            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()},
-            "depends": "notifications"
+            "options": {
+                name: f"Send notifications via {name}"
+                for name in core.channel.get_available_channels()
+            },
+            "depends": "notifications",
         },
         "notification_window": {
             "description": "Amount of minutes in advance you should be notified. You can set this to 0 to be notified at the time of the event.",
             "default": 30,
-            "depends": "notifications"
-        }
+            "depends": "notifications",
+        },
     }
 
     async def on_ready(self):
         self.events = core.storage.StorageList("calendar", "json")
+
+        # tracks scheduled notification timers by event id so they can be
+        # cancelled/replaced instead of accumulating
+        self._timers = {}
 
         # schedule all event notifications
         for event in self.events:
@@ -54,7 +63,9 @@ class Calendar(core.module.Module):
         event_time = datetime.datetime.fromisoformat(event["date"])
         now = datetime.datetime.now()
 
-        window_minutes = int(event.get("notification_window", self.config.get("notification_window")))
+        window_minutes = int(
+            event.get("notification_window", self.config.get("notification_window"))
+        )
         window_seconds = window_minutes * 60
 
         delay = (event_time - now).total_seconds() - window_seconds
@@ -66,11 +77,15 @@ class Calendar(core.module.Module):
 
         try:
             loop = asyncio.get_running_loop()
+            # cancel any previously scheduled notification for this event so
+            # rescheduling (e.g. on edit) replaces rather than accumulates timers
+            existing = self._timers.pop(event["id"], None)
+            if existing:
+                existing.cancel()
             # We use a lambda to wrap the async function in a task
             # because call_later requires a sync callable.
-            loop.call_later(
-                delay,
-                lambda: asyncio.create_task(self._notify_user(event))
+            self._timers[event["id"]] = loop.call_later(
+                delay, lambda: asyncio.create_task(self._notify_user(event))
             )
         except Exception as e:
             self.log("calendar", f"failed to schedule notification: {core.detail_error(e)}")
@@ -104,7 +119,7 @@ class Calendar(core.module.Module):
             await channel.context.chat.messages.add({"role": "assistant", "content": message})
 
             # disable notification
-            index = await self._get_event_by_id(event['id'])
+            index = await self._get_event_by_id(event["id"])
             if index != -1:
                 self.events[index]["notify"] = False
                 self.events.save()
@@ -136,7 +151,7 @@ class Calendar(core.module.Module):
 
     async def _get_event_by_id(self, id: str):
         for index, event in enumerate(self.events):
-            if event['id'].strip() == id.strip():
+            if event["id"].strip() == id.strip():
                 return index
 
         return -1
@@ -153,21 +168,25 @@ class Calendar(core.module.Module):
 
         return "\n".join(output)
 
-    async def add_event(self, title: str, year: int, month: int, day: int, hour: int, minute: int, should_notify: bool = True, notify_channel: str = None):
+    async def add_event(
+        self,
+        title: str,
+        year: int,
+        month: int,
+        day: int,
+        hour: int,
+        minute: int,
+        should_notify: bool = True,
+        notify_channel: str = None,
+    ):
         event = {
             "id": str(ulid.ULID()),
             "title": title,
             "date": datetime.datetime.isoformat(
-                datetime.datetime(
-                    year=year,
-                    month=month,
-                    day=day,
-                    hour=hour,
-                    minute=minute
-                )
+                datetime.datetime(year=year, month=month, day=day, hour=hour, minute=minute)
             ),
             "notify": should_notify,
-            "notify_channel": notify_channel or self.config.get("notification_channel")
+            "notify_channel": notify_channel or self.config.get("notification_channel"),
         }
 
         self.events.append(event)
@@ -178,31 +197,51 @@ class Calendar(core.module.Module):
 
         return self.result(f"appointment added with ID {event['id']}")
 
-    async def edit_event(self, id: str, title: str = None, year: int = None, month: int = None, day: int = None, hour: int = None, minute: int = None, should_notify: bool = True, notify_channel: str = None):
+    async def edit_event(
+        self,
+        id: str,
+        title: str = None,
+        year: int = None,
+        month: int = None,
+        day: int = None,
+        hour: int = None,
+        minute: int = None,
+        should_notify: bool = None,
+        notify_channel: str = None,
+    ):
         index = await self._get_event_by_id(id)
         if index < 0:
             return self.result("Error: Event with that ID does not exist", success=False)
 
         event = self.events[index]
-        event_date = datetime.datetime.fromisoformat(event['date'])
+        event_date = datetime.datetime.fromisoformat(event["date"])
         new_date_iso = datetime.datetime.isoformat(
             datetime.datetime(
                 year=year or event_date.year,
                 month=month or event_date.month,
                 day=day or event_date.day,
                 hour=hour or event_date.hour,
-                minute=minute or event_date.minute
+                minute=minute or event_date.minute,
             )
         )
 
-        self.events[index]["title"] = title or event['title']
+        # only override notify when explicitly provided, so edits can turn it OFF
+        notify = should_notify if should_notify is not None else event["notify"]
+
+        self.events[index]["title"] = title or event["title"]
         self.events[index]["date"] = new_date_iso
-        self.events[index]["notify"] = should_notify or event['notify']
-        self.events[index]["notify_channel"] = notify_channel or event['notify_channel']
+        self.events[index]["notify"] = notify
+        self.events[index]["notify_channel"] = notify_channel or event["notify_channel"]
         self.events.save()
 
-        if should_notify:
+        if notify:
+            # _schedule_notification cancels/replaces any existing timer for this id
             await self._schedule_notification(event)
+        else:
+            # notification turned off: cancel any pending timer
+            existing = self._timers.pop(event["id"], None)
+            if existing:
+                existing.cancel()
 
         return self.result(f"event {event['id']} edited")
 
@@ -212,6 +251,13 @@ class Calendar(core.module.Module):
             return self.result("Error: Event with that ID does not exist", success=False)
 
         self.events.pop(index)
+        self.events.save()
+
+        # cancel any pending notification timer for the deleted event
+        existing = self._timers.pop(id, None)
+        if existing:
+            existing.cancel()
+
         return self.result(f"event {id} deleted")
 
     @core.module.command("calendar", send_to_ai=False)
@@ -232,7 +278,11 @@ class Calendar(core.module.Module):
             # Custom range
             try:
                 past_boundary = datetime.datetime.fromisoformat(args[0])
-                future_boundary = datetime.datetime.fromisoformat(args[1]) if len(args) > 1 else past_boundary + datetime.timedelta(days=1)
+                future_boundary = (
+                    datetime.datetime.fromisoformat(args[1])
+                    if len(args) > 1
+                    else past_boundary + datetime.timedelta(days=1)
+                )
             except ValueError:
                 return "Error: Invalid date format. Use ISO format (e.g., 2024-01-15)."
 
@@ -250,7 +300,7 @@ class Calendar(core.module.Module):
 
         output = []
         for event in matches:
-            date_str = datetime.datetime.fromisoformat(event['date']).strftime("%x at %X")
+            date_str = datetime.datetime.fromisoformat(event["date"]).strftime("%x at %X")
             output.append(f"{date_str}: {event['title']}")
 
         return "\n".join(output)
@@ -263,7 +313,9 @@ class Calendar(core.module.Module):
             past_boundary = datetime.datetime.fromisoformat(start_date)
             future_boundary = datetime.datetime.fromisoformat(end_date)
         except ValueError:
-            return self.result("Error: Invalid date format. Use ISO format (e.g., 2024-01-15).", success=False)
+            return self.result(
+                "Error: Invalid date format. Use ISO format (e.g., 2024-01-15).", success=False
+            )
 
         matches = []
         for event in self.events:

@@ -1,40 +1,39 @@
-import core
-import os
-import shutil
 import asyncio
-import time
 import json
 import logging
+import os
+import shutil
+import time
 import traceback
-from typing import Optional, Dict, Any, List
 from collections import deque
+
+import core
 
 try:
     from nio import (
         AsyncClient,
         AsyncClientConfig,
-        LoginResponse,
-        RoomMessageText,
-        RoomMessageEmote,
-        RoomMessageImage,
-        RoomMessageAudio,
-        RoomMessageVideo,
-        RoomMessageFile,
-        MegolmEvent,
         InviteMemberEvent,
-        SyncResponse,
-        SyncError,
-        RoomSendResponse,
-        KeyVerificationStart,
+        KeysClaimError,
         KeyVerificationCancel,
         KeyVerificationKey,
         KeyVerificationMac,
+        KeyVerificationStart,
+        LoginResponse,
+        MegolmEvent,
         RoomKeyRequest,
         RoomKeyRequestCancellation,
-        ToDeviceError,
-        KeysClaimError,
+        RoomMessageAudio,
+        RoomMessageEmote,
+        RoomMessageFile,
+        RoomMessageImage,
+        RoomMessageText,
+        RoomMessageVideo,
+        RoomSendResponse,
         ShareGroupSessionError,
-        LocalProtocolError,
+        SyncError,
+        SyncResponse,
+        ToDeviceError,
         UnknownEvent,
     )
     from nio.store import SqliteStore
@@ -45,11 +44,12 @@ except:
 # Attempt to import encrypted media classes (available in newer nio versions)
 try:
     from nio import (
-        RoomEncryptedImage,
         RoomEncryptedAudio,
-        RoomEncryptedVideo,
         RoomEncryptedFile,
+        RoomEncryptedImage,
+        RoomEncryptedVideo,
     )
+
     ENCRYPTED_MEDIA_CLASSES = (
         RoomEncryptedImage,
         RoomEncryptedAudio,
@@ -77,6 +77,7 @@ for _noisy in (
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 logging.getLogger("nio").setLevel(logging.WARNING)
 
+
 class Matrix(core.channel.Channel):
     """
     Matrix channel with encryption support. Experimental, a bit unstable.
@@ -90,7 +91,29 @@ class Matrix(core.channel.Channel):
         "homeserver": "https://matrix.org",
         "user_id": "@your_bot:matrix.org",
         "password": "your_password_here",
-        "device_name": "OpenLumara"
+        "device_name": "OpenLumara",
+        # Comma-separated allowlist of Matrix user IDs permitted to talk to the
+        # bot (e.g. "@you:matrix.org,@friend:matrix.org"). Fail-closed: if both
+        # this and allowed_rooms are empty the bot ignores EVERYONE. Only
+        # messages from allowed senders are handled.
+        "allowed_users": "",
+        # Optional comma-separated allowlist of room IDs the bot will operate
+        # in. Empty means any room (senders are still gated by allowed_users).
+        "allowed_rooms": "",
+        # Auto-join invites. OFF by default. When on, only invites FROM an
+        # allowed_users sender are joined. (Env var MATRIX_AUTO_JOIN overrides.)
+        "auto_join": False,
+        # E2EE trust. When True the bot verifies EVERY device it sees and
+        # auto-confirms SAS with no human emoji comparison (blind trust, no
+        # MITM protection). INSECURE - OFF by default; verify devices manually.
+        "auto_trust_devices": False,
+        # When True, messages are encrypted to unverified/unknown devices too.
+        # OFF by default so unknown devices are not silently trusted.
+        "ignore_unverified_devices": False,
+        # NOTE: the access token / password and E2EE keys are stored in
+        # PLAINTEXT on disk (matrix_credentials.json + the nio crypto store).
+        # Protect the data directory accordingly - encryption-at-rest is not
+        # implemented here.
     }
 
     def __init__(self, *args, **kwargs):
@@ -104,6 +127,11 @@ class Matrix(core.channel.Channel):
             self.access_token: str = cfg.get("access_token", "")
             self.device_id: str = cfg.get("device_id", "")
             self.device_name: str = cfg.get("device_name", "Core Bot")
+            self.allowed_users: set[str] = self._parse_csv(cfg.get("allowed_users", ""))
+            self.allowed_rooms: set[str] = self._parse_csv(cfg.get("allowed_rooms", ""))
+            self.auto_trust_devices: bool = bool(cfg.get("auto_trust_devices", False))
+            self.ignore_unverified_devices: bool = bool(cfg.get("ignore_unverified_devices", False))
+            cfg_auto_join = bool(cfg.get("auto_join", False))
         except (AttributeError, TypeError) as e:
             self.log("matrix", f"Config error: {e}")
             self.homeserver = ""
@@ -112,12 +140,23 @@ class Matrix(core.channel.Channel):
             self.access_token = ""
             self.device_id = ""
             self.device_name = "Core Bot"
+            self.allowed_users = set()
+            self.allowed_rooms = set()
+            self.auto_trust_devices = False
+            self.ignore_unverified_devices = False
+            cfg_auto_join = False
 
-        self.client: Optional[AsyncClient] = None
+        self.client: AsyncClient | None = None
         self._shutting_down = False
         self._store_path = self._get_store_path()
         self._ready = False
-        self._auto_join = os.getenv("MATRIX_AUTO_JOIN", "true").lower() == "true"
+        # Auto-join is OFF by default (fail-closed). The env var, if set,
+        # overrides the config; otherwise fall back to the config value.
+        env_auto_join = os.getenv("MATRIX_AUTO_JOIN")
+        if env_auto_join is not None:
+            self._auto_join = env_auto_join.lower() == "true"
+        else:
+            self._auto_join = cfg_auto_join
         self._blacklisted_devices: set[tuple[str, str]] = set()
 
         # ── Robustness members from reference code ───────────────────────────
@@ -125,7 +164,7 @@ class Matrix(core.channel.Channel):
         # Deduplication
         self._processed_events: deque = deque(maxlen=1000)
         # Buffer for undecrypted events (waiting for keys)
-        self._pending_megolm: List[tuple] = []
+        self._pending_megolm: list[tuple] = []
         self._MAX_PENDING_EVENTS = 100
         self._PENDING_EVENT_TTL = 300  # seconds
 
@@ -150,15 +189,34 @@ class Matrix(core.channel.Channel):
             json.dump(creds, f)
         self.log("matrix", f"Credentials saved to {path}")
 
-    def _load_credentials(self) -> Optional[Dict[str, str]]:
+    def _load_credentials(self) -> dict[str, str] | None:
         path = self._get_credentials_path()
         if os.path.exists(path):
             try:
-                with open(path, "r") as f:
+                with open(path) as f:
                     return json.load(f)
             except Exception as e:
                 self.log("matrix", f"Failed to load credentials: {e}")
         return None
+
+    @staticmethod
+    def _parse_csv(value) -> set:
+        if not value:
+            return set()
+        return {item.strip() for item in str(value).split(",") if item.strip()}
+
+    def _is_authorized(self, sender: str, room_id: str) -> bool:
+        """
+        Fail-closed access control. A message is handled only when it passes
+        every configured allowlist. If NO allowlist is configured at all, no
+        one is authorized (the owner must set allowed_users and/or
+        allowed_rooms).
+        """
+        if not self.allowed_users and not self.allowed_rooms:
+            return False
+        if self.allowed_users and sender not in self.allowed_users:
+            return False
+        return not (self.allowed_rooms and room_id not in self.allowed_rooms)
 
     def _room_display_name(self, room_id: str) -> str:
         if self.client and room_id in self.client.rooms:
@@ -215,9 +273,7 @@ class Matrix(core.channel.Channel):
             self._ready = True
             self.running = True
 
-            await self.announce(
-                f"Matrix connected as {self.user_id} (E2EE enabled).", "status"
-            )
+            await self.announce(f"Matrix connected as {self.user_id} (E2EE enabled).", "status")
 
             await self._main_loop()
 
@@ -253,7 +309,7 @@ class Matrix(core.channel.Channel):
             self.client.restore_login(
                 user_id=self.user_id,
                 device_id=self.device_id or "",  # device_id must match stored keys
-                access_token=self.access_token
+                access_token=self.access_token,
             )
             # Ensure crypto store is loaded
             self.client.load_store()
@@ -269,7 +325,7 @@ class Matrix(core.channel.Channel):
             self.client.restore_login(
                 user_id=saved["user_id"],
                 device_id=saved["device_id"],
-                access_token=saved["access_token"]
+                access_token=saved["access_token"],
             )
             self.device_id = saved["device_id"]
             self.client.load_store()
@@ -282,36 +338,28 @@ class Matrix(core.channel.Channel):
             os.makedirs(self._store_path, exist_ok=True)
             self._initialize_client()
 
-        response = await self.client.login(
-            password=self.password, device_name=self.device_name
-        )
+        response = await self.client.login(password=self.password, device_name=self.device_name)
         if isinstance(response, LoginResponse):
             self.device_id = response.device_id
             self.access_token = response.access_token
             self.log("matrix", f"Logged in, device_id={self.device_id}")
-            self._save_credentials(
-                response.user_id, response.device_id, response.access_token
-            )
+            self._save_credentials(response.user_id, response.device_id, response.access_token)
         else:
             raise RuntimeError(f"Login failed: {response}")
 
     # ── callbacks ─────────────────────────────────────────────────────────
 
     def _setup_callbacks(self):
-        self.client.add_event_callback(
-            self._on_room_message, (RoomMessageText, RoomMessageEmote)
-        )
+        self.client.add_event_callback(self._on_room_message, (RoomMessageText, RoomMessageEmote))
 
         # Media callbacks
         self.client.add_event_callback(
             self._on_room_message_media,
-            (RoomMessageImage, RoomMessageAudio, RoomMessageVideo, RoomMessageFile)
+            (RoomMessageImage, RoomMessageAudio, RoomMessageVideo, RoomMessageFile),
         )
         # Encrypted media
         if ENCRYPTED_MEDIA_CLASSES:
-            self.client.add_event_callback(
-                self._on_room_message_media, ENCRYPTED_MEDIA_CLASSES
-            )
+            self.client.add_event_callback(self._on_room_message_media, ENCRYPTED_MEDIA_CLASSES)
 
         self.client.add_event_callback(self._on_megolm_event, (MegolmEvent,))
         self.client.add_event_callback(self._on_invite, (InviteMemberEvent,))
@@ -320,15 +368,9 @@ class Matrix(core.channel.Channel):
         self.client.add_event_callback(self._on_unknown_event, (UnknownEvent,))
 
         # ── Verification Callbacks ──
-        self.client.add_to_device_callback(
-            self._on_key_verification_start, (KeyVerificationStart,)
-        )
-        self.client.add_to_device_callback(
-            self._on_key_verification_key, (KeyVerificationKey,)
-        )
-        self.client.add_to_device_callback(
-            self._on_key_verification_mac, (KeyVerificationMac,)
-        )
+        self.client.add_to_device_callback(self._on_key_verification_start, (KeyVerificationStart,))
+        self.client.add_to_device_callback(self._on_key_verification_key, (KeyVerificationKey,))
+        self.client.add_to_device_callback(self._on_key_verification_mac, (KeyVerificationMac,))
         self.client.add_to_device_callback(
             self._on_key_verification_cancel, (KeyVerificationCancel,)
         )
@@ -342,6 +384,14 @@ class Matrix(core.channel.Channel):
         if not self._ready:
             return
         if event.sender == self.user_id:
+            return
+
+        # Authorization: only respond to allowlisted senders/rooms (fail-closed)
+        if not self._is_authorized(event.sender, room.room_id):
+            self.log(
+                "matrix",
+                f"Ignoring message from unauthorized sender {event.sender} in {room.room_id}",
+            )
             return
 
         # Deduplication
@@ -373,6 +423,11 @@ class Matrix(core.channel.Channel):
             return
         if event.sender == self.user_id:
             return
+
+        # Authorization: only handle media from allowlisted senders/rooms
+        if not self._is_authorized(event.sender, room.room_id):
+            return
+
         if self._is_duplicate_event(event.event_id):
             return
 
@@ -385,14 +440,15 @@ class Matrix(core.channel.Channel):
         url = getattr(event, "url", "")
 
         enc_tag = "enc" if self._room_is_encrypted(room.room_id) else "plain"
-        self.log("matrix", f"Media received in {self._room_display_name(room.room_id)}: {body} ({url})")
+        self.log(
+            "matrix", f"Media received in {self._room_display_name(room.room_id)}: {body} ({url})"
+        )
         # Logic to process media can be added here (e.g. download, transcribe, etc.)
         # For now, we just acknowledge it to avoid crashes.
 
     async def _on_unknown_event(self, room, event):
         """Fallback for events not natively parsed by matrix-nio (e.g. reactions)."""
         # Could log reactions here if needed.
-        pass
 
     async def _on_megolm_event(self, room, event):
         """
@@ -408,7 +464,7 @@ class Matrix(core.channel.Channel):
         # Buffer for retry
         self._pending_megolm.append((room, event, time.time()))
         if len(self._pending_megolm) > self._MAX_PENDING_EVENTS:
-            self._pending_megolm = self._pending_megolm[-self._MAX_PENDING_EVENTS:]
+            self._pending_megolm = self._pending_megolm[-self._MAX_PENDING_EVENTS :]
 
         # Try to request the key from other devices
         try:
@@ -419,6 +475,14 @@ class Matrix(core.channel.Channel):
     async def _on_invite(self, room, event):
         if not self._auto_join:
             self.log("matrix", f"Ignoring invite to {room.room_id} (auto-join off).")
+            return
+
+        # Only auto-join invites from allowlisted users (never blindly join).
+        if event.sender not in self.allowed_users:
+            self.log(
+                "matrix",
+                f"Ignoring invite to {room.room_id} from non-allowlisted {event.sender}.",
+            )
             return
 
         self.log("matrix", f"Invited to {room.room_id} by {event.sender}, joining…")
@@ -439,6 +503,13 @@ class Matrix(core.channel.Channel):
             "matrix",
             f"Verification start from {event.sender} (txn: {event.transaction_id})",
         )
+        if not self.auto_trust_devices:
+            self.log(
+                "matrix",
+                "Auto-verification disabled (auto_trust_devices off); not accepting "
+                "SAS verification automatically. Verify this device manually.",
+            )
+            return
         try:
             resp = await self.client.accept_key_verification(event.transaction_id)
             if isinstance(resp, ToDeviceError):
@@ -453,6 +524,20 @@ class Matrix(core.channel.Channel):
         sas = self.client.key_verifications.get(event.transaction_id)
         if not sas:
             self.log("matrix", f"Unknown verification transaction {event.transaction_id}")
+            return
+
+        # Do NOT auto-confirm the short auth string: a human must compare the
+        # emoji/decimals for this to provide any MITM protection. Only proceed
+        # automatically when the owner has explicitly opted into blind trust.
+        if not self.auto_trust_devices:
+            emojis = sas.get_emoji()
+            if emojis:
+                emoji_str = " ".join(f"{e[0]} ({e[1]})" for e in emojis)
+                self.log("matrix", f"SAS Emojis (verify manually): {emoji_str}")
+            self.log(
+                "matrix",
+                "Auto-SAS-confirm disabled (auto_trust_devices off); not confirming.",
+            )
             return
 
         try:
@@ -485,6 +570,12 @@ class Matrix(core.channel.Channel):
 
     async def _on_key_verification_mac(self, event):
         self.log("matrix", f"Received verification MAC from {event.sender}")
+        if not self.auto_trust_devices:
+            self.log(
+                "matrix",
+                "Auto-verify disabled (auto_trust_devices off); not marking device verified.",
+            )
+            return
         sas = self.client.key_verifications.get(event.transaction_id)
         if not sas:
             return
@@ -512,9 +603,7 @@ class Matrix(core.channel.Channel):
         # If we have the keys, share them (helps other devices decrypt history)
         if isinstance(event, RoomKeyRequest) and event.sender == self.user_id:
             try:
-                await self.client.export_keys_for_key_share(
-                    event.room_id, event.session_id
-                )
+                await self.client.export_keys_for_key_share(event.room_id, event.session_id)
             except Exception:
                 pass
 
@@ -534,11 +623,7 @@ class Matrix(core.channel.Channel):
                 # Filter out blacklisted devices
                 filtered: dict[str, list[str]] = {}
                 for user_id, devices in missing.items():
-                    good = [
-                        d
-                        for d in devices
-                        if (user_id, d) not in self._blacklisted_devices
-                    ]
+                    good = [d for d in devices if (user_id, d) not in self._blacklisted_devices]
                     if good:
                         filtered[user_id] = good
 
@@ -568,7 +653,7 @@ class Matrix(core.channel.Channel):
 
             # 4. Share the Megolm group session with the room
             resp = await self.client.share_group_session(
-                room_id, ignore_unverified_devices=True
+                room_id, ignore_unverified_devices=self.ignore_unverified_devices
             )
             if isinstance(resp, ShareGroupSessionError):
                 self.log(
@@ -582,7 +667,14 @@ class Matrix(core.channel.Channel):
         """
         Trust/verify all unverified devices we know about.
         This helps ensure other clients send us keys.
+
+        Gated behind the auto_trust_devices opt-in (default OFF): blindly
+        verifying every device removes all MITM protection, so by default we
+        leave trust to explicit manual verification.
         """
+        if not self.auto_trust_devices:
+            return
+
         client = self.client
         if not client:
             return
@@ -632,9 +724,11 @@ class Matrix(core.channel.Channel):
             # Successfully decrypted! Route to handler.
             # We dispatch to the text or media handler based on decrypted type
             self.log("matrix", f"Decrypted buffered event {event.event_id}")
-            if hasattr(decrypted, "body"): # Text message
+            if hasattr(decrypted, "body"):  # Text message
                 await self._on_room_message(room, decrypted)
-            elif isinstance(decrypted, (RoomMessageImage, RoomMessageAudio, RoomMessageVideo, RoomMessageFile)):
+            elif isinstance(
+                decrypted, (RoomMessageImage, RoomMessageAudio, RoomMessageVideo, RoomMessageFile)
+            ):
                 await self._on_room_message_media(room, decrypted)
 
         self._pending_megolm = still_pending
@@ -739,7 +833,7 @@ class Matrix(core.channel.Channel):
         except Exception:
             pass
 
-        last_event_id: Optional[str] = None
+        last_event_id: str | None = None
         last_edit_time: float = 0
         tool_calls_display: list[str] = []
         response_parts: list[str] = []
@@ -817,6 +911,7 @@ class Matrix(core.channel.Channel):
         # (Preserved from original)
         try:
             import json_repair
+
             if hasattr(tool_data, "function"):
                 func_name = getattr(tool_data.function, "name", "unknown")
                 raw_args = getattr(tool_data.function, "arguments", "{}")
@@ -860,15 +955,13 @@ class Matrix(core.channel.Channel):
             except Exception as e:
                 self.log("matrix", f"Announce to {room_id} failed: {e}")
 
-
-
     async def _send_room_message(self, room_id: str, text: str):
         try:
             return await self.client.room_send(
                 room_id,
                 "m.room.message",
                 {"msgtype": "m.text", "body": text},
-                ignore_unverified_devices=True,
+                ignore_unverified_devices=self.ignore_unverified_devices,
             )
         except Exception as e:
             self.log("matrix", f"Send failed ({room_id}): {e}")
@@ -888,7 +981,7 @@ class Matrix(core.channel.Channel):
                         "event_id": event_id,
                     },
                 },
-                ignore_unverified_devices=True,
+                ignore_unverified_devices=self.ignore_unverified_devices,
             )
         except Exception as e:
             self.log("matrix", f"Edit failed ({room_id}): {e}")

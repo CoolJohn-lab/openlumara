@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# detect a python interpreter for creating the virtual environment
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+else
+    echo "error: no python interpreter found (tried python3 and python). aborting."
+    exit 1
+fi
+
 echo "checking for updates..."
 if git fetch origin 2>/dev/null; then
     if git rev-parse --abbrev-ref @{u} >/dev/null 2>&1; then
@@ -8,7 +18,11 @@ if git fetch origin 2>/dev/null; then
 
         if [ "$LOCAL" != "$REMOTE" ]; then
             echo "updates available! pulling changes..."
-            git pull
+            # --ff-only refuses to merge if the remote diverged, so we never
+            # auto-execute a rewritten/force-pushed history
+            if ! git pull --ff-only; then
+                echo "warning: remote is not a fast-forward of local; refusing to pull. resolve manually."
+            fi
         else
             echo "already up to date."
         fi

@@ -1,28 +1,23 @@
 import core
 
+
 class TokenThreshold(core.module.Module):
     """Will make the AI warn you if you're approaching the token limit"""
 
-    settings = {
-        "warning_threshold": {
-            "default": 0.8,
-            "type": "percentage"
-        }
-    }
+    settings = {"warning_threshold": {"default": 0.8, "type": "percentage"}}
 
     async def on_end_prompt(self):
-        # Check if we have a channel and context to avoid recursion
-        if not hasattr(self, 'channel') or not hasattr(self.channel, 'context'):
+        # bail out if there's no channel/context to read token usage from
+        if not hasattr(self, "channel") or not hasattr(self.channel, "context"):
             return None
-            
-        # Use prevent_recursion flag to avoid infinite recursion
+
         current = self.channel.context.chat.get("token_usage", 0)
         max_tokens = int(core.config.get("api", "max_context"))
-        
+
         # Avoid division by zero
         if max_tokens <= 0:
             return None
-            
+
         used_percentage = (current / max_tokens) * 100
 
         warning_threshold_percent = self.config.get("warning_threshold")
@@ -32,5 +27,4 @@ class TokenThreshold(core.module.Module):
             remaining_percentage = 100 - used_percentage
 
             return f"WARNING: Approaching token limit! You have used {used_percentage:.1f}% of the allowed tokens. {remaining_percentage:.1f}% remaining. Warn the user!! The user might want to use `/compress` to summarize the chat so far (the user won't lose chat history, but the AI won't see the messages anymore). Or the user can use `/new` to start a new chat."
-        else:
-            return None
+        return None

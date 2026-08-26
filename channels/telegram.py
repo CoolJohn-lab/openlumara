@@ -1,26 +1,37 @@
-import core
-import os
 import asyncio
-import time
-import json
-import json_repair
+import os
+
+import core
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram.error import BadRequest
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
 
 class Telegram(core.channel.Channel):
     """Talk to your AI over Telegram"""
+
     running = False
 
     dependencies = ["python-telegram-bot"]
 
-    settings =  {
+    settings = {
         "token": "TOKEN_HERE",
+        # Explicit owner authorization (PREFERRED). Set to your numeric Telegram
+        # chat ID to lock the bot to a single chat. When set, every other chat
+        # is ignored and trust-on-first-use is disabled.
+        "authorized_chat_id": "",
+        # Optional: also require the sender's Telegram @username to match this
+        # (used only for the TOFU fallback below).
+        "authorized_username": "",
+        # Trust-on-first-use fallback. OFF by default: without an explicit
+        # authorized_chat_id the bot refuses everyone. Enable only if you cannot
+        # pre-configure your chat ID; the first chat to /start then claims it
+        # (clearly logged).
+        "allow_tofu": False,
         "use_message_streaming": True,
         "stream_tool_calls": False,
         "show_reasoning": False,
         "announce_startup": False,
-        "announce_shutdown": False
+        "announce_shutdown": False,
     }
 
     async def run(self):
@@ -33,18 +44,47 @@ class Telegram(core.channel.Channel):
 
         self.app = None
 
+        # ── Owner authorization ───────────────────────────────────────────
+        # An explicit configured chat ID always wins; TOFU is an opt-in
+        # fallback only.
+        self.configured_chat_id = None
+        self.allow_tofu = False
+        self.authorized_username = ""
+        try:
+            cfg_id = self.config.get("authorized_chat_id")
+            self.allow_tofu = bool(self.config.get("allow_tofu"))
+            self.authorized_username = (self.config.get("authorized_username") or "").lstrip("@")
+        except AttributeError:
+            cfg_id = None
+        if cfg_id is not None and str(cfg_id).strip():
+            try:
+                self.configured_chat_id = int(cfg_id)
+            except (ValueError, TypeError):
+                self.log("telegram", "Failed to parse configured authorized_chat_id.")
+
         # Initialize StorageText to handle the authorized chat ID
         self.auth_storage = core.storage.StorageText("telegram_chat_id")
 
-        # Load the stored chat ID from disk
-        stored_id = self.auth_storage.get()
+        # Resolve the authorized chat ID: explicit config first, then the TOFU
+        # store (only if TOFU is enabled). Fail-closed otherwise.
         self.authorized_chat_id = None
-        if stored_id and stored_id.strip():
-            try:
-                self.authorized_chat_id = int(stored_id)
-                self.log("telegram", f"Restored authorized chat ID: {self.authorized_chat_id}")
-            except ValueError:
-                self.log("telegram", "Failed to parse stored chat ID.")
+        if self.configured_chat_id is not None:
+            self.authorized_chat_id = self.configured_chat_id
+            self.log("telegram", f"Using configured authorized chat ID: {self.authorized_chat_id}")
+        elif self.allow_tofu:
+            stored_id = self.auth_storage.get()
+            if stored_id and stored_id.strip():
+                try:
+                    self.authorized_chat_id = int(stored_id)
+                    self.log("telegram", f"Restored TOFU chat ID: {self.authorized_chat_id}")
+                except ValueError:
+                    self.log("telegram", "Failed to parse stored chat ID.")
+        else:
+            self.log(
+                "telegram",
+                "No authorized_chat_id configured and TOFU disabled; bot will "
+                "ignore all chats until an owner is configured.",
+            )
 
         self._shutting_down = False
 
@@ -77,7 +117,7 @@ class Telegram(core.channel.Channel):
                 await asyncio.sleep(1)
 
         except Exception as e:
-            self.log("telegram", f"Critical Error: {str(e)}")
+            self.log("telegram", f"Critical Error: {e!s}")
             return False
         finally:
             # Clean up the queue task
@@ -102,16 +142,35 @@ class Telegram(core.channel.Channel):
             self._shutting_down = True
             return True
 
+    def _username_allowed(self, update: Update) -> bool:
+        """When an authorized_username is configured, the sender must match it."""
+        if not self.authorized_username:
+            return True
+        user = getattr(update, "effective_user", None)
+        uname = (getattr(user, "username", "") or "").lstrip("@")
+        return uname.lower() == self.authorized_username.lower()
+
     async def _tg_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
 
-        if self.authorized_chat_id is None:
+        # Already the owner.
+        if self.authorized_chat_id is not None:
+            if chat_id == self.authorized_chat_id:
+                await update.message.reply_text("✅ Session started.\n")
+            else:
+                await update.message.reply_text("⚠️ This bot is already in use.")
+            return
+
+        # No owner yet: claim via TOFU only if it is enabled (and no explicit
+        # config was provided) and the username matches any configured filter.
+        if self.allow_tofu and self._username_allowed(update):
             self.authorized_chat_id = chat_id
             self.auth_storage.set(str(chat_id))
             await update.message.reply_text("✅ Session started.\n")
-            self.log("telegram", f"Authorized chat ID: {chat_id}")
-        elif self.authorized_chat_id != chat_id:
-            await update.message.reply_text("⚠️ This bot is already in use.")
+            self.log("telegram", f"[TOFU] Authorized chat ID: {chat_id}")
+        else:
+            await update.message.reply_text("⚠️ This bot is not configured for you.")
+            self.log("telegram", f"Rejected /start from unauthorized chat {chat_id}")
 
     async def _tg_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -123,12 +182,16 @@ class Telegram(core.channel.Channel):
             return
 
         chat_id = update.effective_chat.id
-        if self.authorized_chat_id and chat_id != self.authorized_chat_id:
-            return
-
-        if not self.authorized_chat_id:
+        # Only the authorized owner is ever served.
+        if self.authorized_chat_id is not None:
+            if chat_id != self.authorized_chat_id:
+                return
+        elif self.allow_tofu and self._username_allowed(update):
             self.authorized_chat_id = chat_id
             self.auth_storage.set(str(chat_id))
+            self.log("telegram", f"[TOFU] Authorized chat ID via message: {chat_id}")
+        else:
+            return
 
         text = update.message.text.strip()
         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
@@ -163,7 +226,10 @@ class Telegram(core.channel.Channel):
                         # Process the message (this waits for the stream to finish)
                         await self._process_stream(update, context)
                     else:
-                        response = await self.send(user_msg, commands_authorized=True)
+                        response = await self.send(
+                            user_msg,
+                            commands_authorized=(chat_id == self.authorized_chat_id),
+                        )
                         if response:
                             content = response.get("content")
                             if content:
@@ -186,7 +252,7 @@ class Telegram(core.channel.Channel):
                 break
             except Exception as e:
                 self.log("telegram", f"Queue worker error: {e}")
-                await asyncio.sleep(1) # Prevent tight loop on error
+                await asyncio.sleep(1)  # Prevent tight loop on error
 
     async def _process_stream(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -226,13 +292,13 @@ class Telegram(core.channel.Channel):
         try:
             # 2. Consume the stream
             # Use a chunk size similar to Discord's MAX_CHARS
+            # Commands are only authorized for the verified owner chat.
+            commands_authorized = chat_id == self.authorized_chat_id
             stream = self.format_stream_for_text(
-                self.send_stream(user_msg, commands_authorized=True),
+                self.send_stream(user_msg, commands_authorized=commands_authorized),
                 use_markdown=False,
-                chunk_size=1900
+                chunk_size=1900,
             )
-
-            # command authorization enabled by default for now. group chat support is coming later, the telegram channel is meant to be used in private DM's
 
             async for token in stream:
                 if token.get("type") == "new_chunk":
@@ -241,8 +307,9 @@ class Telegram(core.channel.Channel):
                         if state.message_obj:
                             try:
                                 await state.message_obj.edit_text(state.full_content[:4000])
-                            except: pass
-                        
+                            except:
+                                pass
+
                         # Start new message
                         state.message_obj = await context.bot.send_message(chat_id, "...")
                         state.full_content = ""
@@ -265,16 +332,18 @@ class Telegram(core.channel.Channel):
                 if state.message_obj:
                     try:
                         await state.message_obj.edit_text(state.full_content[:4000])
-                    except: pass
+                    except:
+                        pass
                 elif state.full_content:
                     try:
                         await context.bot.send_message(chat_id, state.full_content[:4000])
-                    except: pass
+                    except:
+                        pass
 
         except Exception as e:
             self.log("telegram", f"Error processing stream: {e}")
             try:
-                await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
+                await context.bot.send_message(chat_id, f"❌ Error: {e!s}")
             except:
                 pass
         finally:
@@ -312,7 +381,7 @@ class Telegram(core.channel.Channel):
             return
 
         max_length = 4000
-        
+
         if len(text) <= max_length:
             try:
                 await bot.send_message(chat_id, text, parse_mode="Markdown")
@@ -328,14 +397,14 @@ class Telegram(core.channel.Channel):
             if len(text) <= max_length:
                 chunks.append(text)
                 break
-            
+
             # Try to split at a newline or space within the limit
-            split_idx = text.rfind('\n', 0, max_length)
+            split_idx = text.rfind("\n", 0, max_length)
             if split_idx == -1:
-                split_idx = text.rfind(' ', 0, max_length)
+                split_idx = text.rfind(" ", 0, max_length)
             if split_idx == -1:
                 split_idx = max_length
-            
+
             chunks.append(text[:split_idx].strip())
             text = text[split_idx:].strip()
 

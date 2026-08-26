@@ -1,8 +1,10 @@
-import datetime
 import asyncio
+import datetime
+import random
+import re
+
 import core
 import ulid
-import re
 
 
 class Scheduler(core.module.Module):
@@ -13,11 +15,14 @@ class Scheduler(core.module.Module):
             "type": "select",
             "default": "webui",
             "description": "Which channel to send notifications to by default",
-            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
+            "options": {
+                name: f"Send notifications via {name}"
+                for name in core.channel.get_available_channels()
+            },
         },
         "insert_system_prompt": {
             "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
-            "default": True
+            "default": True,
         },
         "prompt_strategy": {
             "type": "select",
@@ -25,10 +30,15 @@ class Scheduler(core.module.Module):
             "options": {
                 "system prompt + instruction": "Sends the system prompt and the scheduled instruction, without chat history. Token-efficient, but may induce prompt reprocessing due to context switching.",
                 "full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens.",
-                "instruction only": "The most token-efficient option. sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching."
-            }
+                "instruction only": "The most token-efficient option. sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching.",
+            },
         },
-        "allow_recurring_jobs": True
+        "allow_recurring_jobs": True,
+        "scheduled_job_allowed_tools": {
+            "type": "list",
+            "default": ["notes_", "lists_", "memory_"],
+            "description": "Allowlist of tools that scheduled jobs may call when they auto-execute unattended. Scheduled job actions are model-authored and run with no human present, so this is deliberately restrictive: by default only the AI's own local note, list and memory tools are permitted (no shell, http, coder, file_manager, config or modules access). An entry ending in '_' matches every tool of that module (e.g. 'notes_' allows all notes tools); any other entry must match a tool name exactly. Leave this empty to forbid all tool use by scheduled jobs. Broaden it ONLY if you accept the prompt-injection risk of letting scheduled actions reach more powerful tools. scheduler_* tools are always excluded regardless of this setting.",
+        },
     }
 
     async def on_ready(self, *args, **kwargs):
@@ -43,7 +53,7 @@ class Scheduler(core.module.Module):
 
     async def on_unload(self, *args, **kwargs):
         """Clean up the dispatcher task on module unload."""
-        if hasattr(self, '_dispatcher_task') and self._dispatcher_task:
+        if hasattr(self, "_dispatcher_task") and self._dispatcher_task:
             self._dispatcher_task.cancel()
             try:
                 await self._dispatcher_task
@@ -79,7 +89,10 @@ class Scheduler(core.module.Module):
                     if job.get("recurring"):
                         # Advance recurring job to future without executing missed instances
                         self._advance_recurring_to_future(job)
-                        self.log("scheduler", f"advanced missed recurring job {job_id} to next future time")
+                        self.log(
+                            "scheduler",
+                            f"advanced missed recurring job {job_id} to next future time",
+                        )
                     else:
                         # Overdue one-time job: execute immediately
                         await self._job_wrapper(job)
@@ -88,14 +101,11 @@ class Scheduler(core.module.Module):
                 # Wait until the job is due or until the schedule changes
                 self._reschedule_event.clear()
                 try:
-                    await asyncio.wait_for(
-                        self._reschedule_event.wait(),
-                        timeout=delay
-                    )
+                    await asyncio.wait_for(self._reschedule_event.wait(), timeout=delay)
                     # Event was set — schedule changed, restart loop
                     self._reschedule_event.clear()
                     continue
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Timer expired — time to execute the job
                     pass
 
@@ -187,7 +197,9 @@ class Scheduler(core.module.Module):
         next_time = self._calculate_next_from(current_trigger, recur)
 
         if next_time is None:
-            self.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+            self.log(
+                "scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval"
+            )
             return
 
         # If next_time is still in the past, advance until it's in the future
@@ -197,12 +209,18 @@ class Scheduler(core.module.Module):
         while next_time <= now and iteration < max_iterations:
             next_time = self._calculate_next_from(next_time, recur)
             if next_time is None:
-                self.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+                self.log(
+                    "scheduler",
+                    f"could not reschedule recurring job {job.get('id')}: invalid interval",
+                )
                 return
             iteration += 1
 
         if next_time <= now:
-            self.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            self.log(
+                "scheduler",
+                f"could not advance job {job.get('id')} to future after {max_iterations} iterations",
+            )
             return
 
         # Update the trigger time in storage
@@ -237,7 +255,10 @@ class Scheduler(core.module.Module):
             iteration += 1
 
         if next_time <= now:
-            self.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            self.log(
+                "scheduler",
+                f"could not advance job {job.get('id')} to future after {max_iterations} iterations",
+            )
             return
 
         # Update in storage
@@ -275,14 +296,32 @@ class Scheduler(core.module.Module):
             self.log("scheduler", f"error executing job {job_id}: no channel available")
             return
 
-        if not hasattr(job_channel, 'context') or job_channel.context is None:
+        if not hasattr(job_channel, "context") or job_channel.context is None:
             self.log("scheduler", f"error executing job {job_id}: channel has no valid context")
             return
 
-        # Filter out scheduler tools to prevent circular scheduling
+        # Scheduled jobs auto-execute unattended with model-authored actions, so
+        # restrict tool access to an explicit, configurable allowlist. This is a
+        # prompt-injection guard: content ingested now could schedule a job that
+        # later fires with tool access. scheduler_* tools are always excluded to
+        # prevent circular scheduling. Applies to both one-time and recurring jobs.
+        allowed_tools = self.config.get("scheduled_job_allowed_tools") or []
+
+        def _tool_allowed(name: str) -> bool:
+            if name.startswith("scheduler_"):
+                return False
+            for entry in allowed_tools:
+                # An entry ending in "_" matches a whole module's tools by prefix,
+                # otherwise it must match the tool name exactly.
+                if entry.endswith("_"):
+                    if name.startswith(entry):
+                        return True
+                elif name == entry:
+                    return True
+            return False
+
         tools = [
-            t for t in self.manager.tools
-            if not t.get("function", {}).get("name", "").startswith("scheduler_")
+            t for t in self.manager.tools if _tool_allowed(t.get("function", {}).get("name", ""))
         ]
 
         action = job.get("action")
@@ -295,50 +334,82 @@ Use tools if needed. For simple reminders, do not use tools.
         """.strip()
 
         instr_role = "developer" if job_channel.manager.API.supports_developer_role else "user"
-        instruction_message = {
-            "role": instr_role,
-            "content": instr_str
-        }
+        instruction_message = {"role": instr_role, "content": instr_str}
 
-        instruction_message_pure = {
-            "role": "system",
-            "content": action
-        }
+        instruction_message_pure = {"role": "system", "content": action}
 
-        # Retry loop
+        # If the allowlist resolves to no tools, disable tool use entirely.
+        # Passing an empty list would make the API fall back to ALL tools.
+        use_tools = bool(tools)
+
+        # Retry loop with a bounded attempt cap and capped exponential backoff
+        # with jitter, so a permanently-failing job stops instead of hammering
+        # the API forever. tool_timeout (from core config) bounds each attempt.
         base_delay = 5  # seconds
         max_delay = 300  # 5 minutes cap
+        max_attempts = 5
+        tool_timeout = core.config.get("core", "tool_timeout", default=30)
         response = None
 
-        while True:
+        for attempt in range(max_attempts):
             try:
                 final_messages = []
                 match self.config.get("prompt_strategy"):
                     case "instruction only":
                         final_messages = [instruction_message_pure]
                     case "system prompt + instruction":
-                        sysprompt = await job_channel.context.get(system_prompt=True, end_prompt=False, history=False)
-                        final_messages = sysprompt+[instruction_message]
+                        sysprompt = await job_channel.context.get(
+                            system_prompt=True, end_prompt=False, history=False
+                        )
+                        final_messages = [*sysprompt, instruction_message]
                     case "full context":
                         # Build a fresh private copy each attempt (context may have changed)
                         base_messages = await job_channel.context.get(end_prompt=False)
-                        final_messages = list(base_messages) + [instruction_message]
+                        final_messages = [*base_messages, instruction_message]
 
-                response = await self.manager.API.send(
-                    final_messages,
-                    use_tools=True,
-                    tools=tools
+                response = await asyncio.wait_for(
+                    self.manager.API.send(
+                        final_messages,
+                        use_tools=use_tools,
+                        tools=(tools if use_tools else None),
+                    ),
+                    timeout=tool_timeout,
                 )
 
                 if response:
                     break  # Success
 
-                self.log("scheduler", f"job {job_id}: empty response, retrying in {base_delay}s")
+                reason = "empty response"
 
+            except asyncio.CancelledError:
+                raise
+            except TimeoutError:
+                reason = f"timed out after {tool_timeout}s"
             except Exception as e:
-                self.log("scheduler", f"job {job_id}: failed: {e}, retrying in {base_delay}s")
+                reason = f"failed: {e}"
 
-            await asyncio.sleep(base_delay)
+            if attempt >= max_attempts - 1:
+                self.log(
+                    "scheduler",
+                    f"job {job_id}: {reason}, giving up after {max_attempts} attempts",
+                )
+                return
+
+            # Capped exponential backoff with jitter
+            delay = min(base_delay * (2**attempt), max_delay)
+            delay += random.uniform(0, delay * 0.1)
+            self.log(
+                "scheduler",
+                f"job {job_id}: {reason}, retrying in {delay:.1f}s "
+                f"(attempt {attempt + 1}/{max_attempts})",
+            )
+            await asyncio.sleep(delay)
+
+        if not response:
+            self.log(
+                "scheduler", f"job {job_id}: no response after {max_attempts} attempts, aborting"
+            )
+            return
 
         # Process response
         final_content = response.get("content", "")
@@ -353,7 +424,9 @@ Use tools if needed. For simple reminders, do not use tools.
             if tool_content:
                 final_content = f"{final_content}\n{tool_content}".strip()
         elif tool_calls:
-            self.log("scheduler", f"error executing job {job_id}: tool calls found but no valid channel")
+            self.log(
+                "scheduler", f"error executing job {job_id}: tool calls found but no valid channel"
+            )
             return
 
         if final_content and job_channel:
@@ -387,10 +460,7 @@ Use tools if needed. For simple reminders, do not use tools.
             target_second = recur.get("target_second", 0)
 
             candidate = base.replace(
-                hour=target_hour,
-                minute=target_minute,
-                second=target_second,
-                microsecond=0
+                hour=target_hour, minute=target_minute, second=target_second, microsecond=0
             )
 
             if recur.get("target_weekday") is not None:
@@ -419,7 +489,7 @@ Use tools if needed. For simple reminders, do not use tools.
             days=recur.get("days", 0),
             hours=recur.get("hours", 0),
             minutes=recur.get("minutes", 0),
-            seconds=recur.get("seconds", 0)
+            seconds=recur.get("seconds", 0),
         )
 
         if delta.total_seconds() == 0:
@@ -469,10 +539,9 @@ Use tools if needed. For simple reminders, do not use tools.
 
             if recur.get("target_weekday") is not None:
                 return f"every {self._weekday_name(recur['target_weekday'])} at {time_str}"
-            elif recur.get("weekdays_only"):
+            if recur.get("weekdays_only"):
                 return f"every weekday at {time_str}"
-            else:
-                return f"every day at {time_str}"
+            return f"every day at {time_str}"
 
         parts = []
         for k in ["weeks", "days", "hours", "minutes", "seconds"]:
@@ -513,7 +582,9 @@ Use tools if needed. For simple reminders, do not use tools.
             return None
 
         if self.schedule:
-            return f"Your scheduler system will trigger these events at the specified times:\n{self}"
+            return (
+                f"Your scheduler system will trigger these events at the specified times:\n{self}"
+            )
         return None
 
     # ---------------------------------------------------------
@@ -534,7 +605,7 @@ Use tools if needed. For simple reminders, do not use tools.
         if recurring and not self.config.get("allow_recurring_jobs"):
             return self.result(
                 "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
-                success=False
+                success=False,
             )
 
         weeks = days = hours = minutes = seconds = 0
@@ -542,24 +613,24 @@ Use tools if needed. For simple reminders, do not use tools.
 
         # Parse relative_duration (e.g., "2d 4h")
         if relative_duration:
-            pattern = r'(\d+)\s*([wdhms])'
+            pattern = r"(\d+)\s*([wdhms])"
             matches = re.findall(pattern, relative_duration)
             for val, unit in matches:
                 val = int(val)
-                if unit == 'w':
+                if unit == "w":
                     weeks = val
-                elif unit == 'd':
+                elif unit == "d":
                     days = val
-                elif unit == 'h':
+                elif unit == "h":
                     hours = val
-                elif unit == 'm':
+                elif unit == "m":
                     minutes = val
-                elif unit == 's':
+                elif unit == "s":
                     seconds = val
 
         # Parse target_time (e.g., "14:30:00")
         if target_time:
-            parts = target_time.split(':')
+            parts = target_time.split(":")
             if len(parts) >= 2:
                 try:
                     target_hour = int(parts[0])
@@ -580,7 +651,9 @@ Use tools if needed. For simple reminders, do not use tools.
 
         # Validate target_weekday
         if target_weekday is not None and not (0 <= target_weekday <= 6):
-            return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
+            return self.result(
+                "error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False
+            )
 
         try:
             # Build recurrence dict
@@ -591,7 +664,7 @@ Use tools if needed. For simple reminders, do not use tools.
                 "minutes": minutes,
                 "seconds": seconds,
                 "target_weekday": target_weekday,
-                "weekdays_only": weekdays_only
+                "weekdays_only": weekdays_only,
             }
             if target_hour is not None:
                 recur["target_hour"] = target_hour
@@ -603,7 +676,11 @@ Use tools if needed. For simple reminders, do not use tools.
             if trigger_time is None:
                 return self.result("error: invalid schedule parameters (zero interval)", False)
 
-            resolved_channel = self.config.get("notification_channel") or channel or (self.channel.name if self.channel else None)
+            resolved_channel = (
+                self.config.get("notification_channel")
+                or channel
+                or (self.channel.name if self.channel else None)
+            )
             if not resolved_channel:
                 return self.result("error: no channel context available", False)
 
@@ -614,7 +691,7 @@ Use tools if needed. For simple reminders, do not use tools.
                 "channel": str(resolved_channel).lower().strip(),
                 "trigger_time": trigger_time.isoformat(),
                 "recurring": recurring,
-                "recurs_in": recur if recurring else None
+                "recurs_in": recur if recurring else None,
             }
 
             self.schedule.append(job)
@@ -653,7 +730,7 @@ Use tools if needed. For simple reminders, do not use tools.
         if final_recurring and not self.config.get("allow_recurring_jobs"):
             return self.result(
                 "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
-                success=False
+                success=False,
             )
 
         try:
@@ -662,25 +739,25 @@ Use tools if needed. For simple reminders, do not use tools.
 
             # Parse relative_duration if provided
             if relative_duration is not None:
-                pattern = r'(\d+)\s*([wdhms])'
+                pattern = r"(\d+)\s*([wdhms])"
                 matches = re.findall(pattern, relative_duration)
                 weeks = days = hours = minutes = seconds = 0
                 for val, unit in matches:
                     val = int(val)
-                    if unit == 'w':
+                    if unit == "w":
                         weeks = val
-                    elif unit == 'd':
+                    elif unit == "d":
                         days = val
-                    elif unit == 'h':
+                    elif unit == "h":
                         hours = val
-                    elif unit == 'm':
+                    elif unit == "m":
                         minutes = val
-                    elif unit == 's':
+                    elif unit == "s":
                         seconds = val
 
             # Parse target_time if provided
             if target_time is not None:
-                parts = target_time.split(':')
+                parts = target_time.split(":")
                 if len(parts) >= 2:
                     try:
                         target_hour = int(parts[0])
@@ -695,16 +772,24 @@ Use tools if needed. For simple reminders, do not use tools.
                         if target_second is not None and not (0 <= target_second <= 59):
                             return self.result("error: second must be between 0 and 59", False)
                     except ValueError:
-                        return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
+                        return self.result(
+                            "error: invalid time format, use HH:MM or HH:MM:SS", False
+                        )
                 else:
                     return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
 
             # Validate target_weekday if provided
             if target_weekday is not None and not (0 <= target_weekday <= 6):
-                return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
+                return self.result(
+                    "error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False
+                )
 
             # Build recurrence dict using provided values or existing ones
-            final_weekdays_only = weekdays_only if weekdays_only is not None else existing_recur.get("weekdays_only", False)
+            final_weekdays_only = (
+                weekdays_only
+                if weekdays_only is not None
+                else existing_recur.get("weekdays_only", False)
+            )
 
             recur = {
                 "weeks": weeks if weeks is not None else existing_recur.get("weeks", 0),
@@ -712,8 +797,10 @@ Use tools if needed. For simple reminders, do not use tools.
                 "hours": hours if hours is not None else existing_recur.get("hours", 0),
                 "minutes": minutes if minutes is not None else existing_recur.get("minutes", 0),
                 "seconds": seconds if seconds is not None else existing_recur.get("seconds", 0),
-                "target_weekday": target_weekday if target_weekday is not None else existing_recur.get("target_weekday"),
-                "weekdays_only": final_weekdays_only
+                "target_weekday": target_weekday
+                if target_weekday is not None
+                else existing_recur.get("target_weekday"),
+                "weekdays_only": final_weekdays_only,
             }
 
             # Handle time fields
@@ -730,10 +817,10 @@ Use tools if needed. For simple reminders, do not use tools.
 
             # Determine if we need to recalculate trigger_time
             time_params_changed = (
-                relative_duration is not None or
-                target_time is not None or
-                target_weekday is not None or
-                weekdays_only is not None
+                relative_duration is not None
+                or target_time is not None
+                or target_weekday is not None
+                or weekdays_only is not None
             )
 
             if time_params_changed:
@@ -751,7 +838,7 @@ Use tools if needed. For simple reminders, do not use tools.
                 "channel": channel if channel is not None else existing.get("channel"),
                 "trigger_time": trigger_time_str,
                 "recurring": final_recurring,
-                "recurs_in": recur if final_recurring else None
+                "recurs_in": recur if final_recurring else None,
             }
 
             self.schedule[index] = updated_job

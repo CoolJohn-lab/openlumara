@@ -5,7 +5,7 @@
                 <template x-for="(block, blockIndex) in message.content" :key="'block-' + blockIndex">
                     <div>
                         <template x-if="blockIndex === 0">
-                            <span x-html="block.text"></span>
+                            <span x-html="renderMarkdown(block.text)"></span>
                         </template>
 
                         <template x-if="blockIndex > 0 && message._metadata?.filenames">

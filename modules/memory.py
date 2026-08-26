@@ -1,9 +1,8 @@
-import core
-import os
-import msgpack
 import datetime
-import re
+
+import core
 import ulid
+
 
 class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
@@ -11,22 +10,18 @@ class Memory(core.module.Module):
     settings = {
         "insert_nudge_prompt": {
             "default": False,
-            "description": "Whether to put extra instructions in the end prompt (after message history) to help the AI autonomously use its memory system, so that it remembers things without you having to explicitely ask it to."
+            "description": "Whether to put extra instructions in the end prompt (after message history) to help the AI autonomously use its memory system, so that it remembers things without you having to explicitely ask it to.",
         },
         "put_pinned_memories_in_system_prompt": {
             "description": "Whether to put the AI's pinned memories in the system prompt. Pinned memories are memories that you or the AI has decided it needs to remember at all times. You can pin a memory by asking your AI to pin it, or sometimes it'll decide to pin by itself if it has decided a memory is important enough. You can always ask it to unpin a memory you don't want pinned!",
-            "default": True
+            "default": True,
         },
-        "max_pinned_memories": {
-            "default": 20,
-            "depends": "put_pinned_memories_in_system_prompt"
-        }
+        "max_pinned_memories": {"default": 20, "depends": "put_pinned_memories_in_system_prompt"},
     }
 
     async def on_ready(self):
         self._mem = core.storage.StorageList("memory", type="msgpack")
         self._mem_deleted = core.storage.StorageList("deleted_memories", type="json")
-        self.max_pinned = 10
 
     def _get_index(self, ulid: str) -> int:
         """checks if a memory with ID exists in memories"""
@@ -54,7 +49,7 @@ class Memory(core.module.Module):
 
             pinned = [f"{m['id']}:\n{m['content']}" for m in prompt_mem_list]
             pinned_str = "\n\n".join(pinned) or "There are currently no pinned memories."
-            pinned_str+="\n\n"
+            pinned_str += "\n\n"
 
         if not pinned_str and not automem_prompt:
             return None
@@ -70,7 +65,7 @@ class Memory(core.module.Module):
 
     async def create(self, content: str, tags: list, pinned: bool = False):
         """Creates a new persistent memory. Use for storing relevant info, preferences, or context for future interactions.
-        
+
         Args:
             content: the contents of the memory
             tags: a list of tags to associate with the memory for later lookup
@@ -81,7 +76,7 @@ class Memory(core.module.Module):
             "content": content,
             "tags": tags,
             "pinned": pinned,
-            "date_created": datetime.datetime.now().isoformat()
+            "date_created": datetime.datetime.now().isoformat(),
         }
         self._mem.append(mem)
         self._mem.save()
@@ -145,14 +140,15 @@ class Memory(core.module.Module):
 
             match_found = False
             # Check if query is in any of the tags
-            if any(query_lower in tag for tag in tags):
-                match_found = True
-            # Check if query is in content (if enabled)
-            elif search_in_content and query_lower in content:
+            if any(query_lower in tag for tag in tags) or (
+                search_in_content and query_lower in content
+            ):
                 match_found = True
 
             if match_found:
-                results.append(f"ID: {mem.get('id')} | Tags: {mem.get('tags')} | Content: {mem.get('content')}")
+                results.append(
+                    f"ID: {mem.get('id')} | Tags: {mem.get('tags')} | Content: {mem.get('content')}"
+                )
 
         if not results:
             return self.result(f"No memories found matching '{query}'.")
@@ -169,10 +165,14 @@ class Memory(core.module.Module):
                 if tag:
                     # Filter by tag (category)
                     if any(tag.lower() in t.lower() for t in tags):
-                        results.append(f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}")
+                        results.append(
+                            f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}"
+                        )
                 else:
                     # List everything unpinned
-                    results.append(f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}")
+                    results.append(
+                        f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}"
+                    )
 
         if not results:
             msg = "No unpinned memories found."

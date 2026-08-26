@@ -1,5 +1,7 @@
-import core
 import json
+
+import core
+
 
 class Context:
     # special message type (not intended to be added to context) that
@@ -35,12 +37,15 @@ class Context:
         # Configuration
         max_messages = int(core.config.get("api").get("max_messages", 200))
         max_tokens = int(core.config.get("api").get("max_context", 8192))
-        system_role = "system" if not self.channel.manager.API.supports_developer_role else "developer"
+        system_role = (
+            "system" if not self.channel.manager.API.supports_developer_role else "developer"
+        )
         dev_role = "developer" if self.channel.manager.API.supports_developer_role else "user"
 
         # 1. Prepare Components
         system_msg = []
         if system_prompt:
+            content = None
             try:
                 content = await self.channel.manager.get_system_prompt()
             except Exception as e:
@@ -64,21 +69,35 @@ class Context:
             # find the last occurence of it and return only the messages from that point onward
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
-                    messages = [{"role": "user", "content": "Summarize our chat so far."}] + messages[i + 1:]
+                    messages = [
+                        {"role": "user", "content": "Summarize our chat so far."}
+                    ] + messages[i + 1 :]
                     break
 
             # Remove ghost messages and signal messages from history
-            messages = [msg for msg in messages if not msg.get("_metadata", {}).get("ghost") and not msg.get("_metadata", {}).get("signal")]
+            messages = [
+                msg
+                for msg in messages
+                if not msg.get("_metadata", {}).get("ghost")
+                and not msg.get("_metadata", {}).get("signal")
+            ]
 
             # Strip invalid assistant messages (those without content or tool calls)
             messages = [
-                msg for msg in messages
-                if not (msg.get("role") == "assistant" and not msg.get("content") and not msg.get("tool_calls"))
+                msg
+                for msg in messages
+                if not (
+                    msg.get("role") == "assistant"
+                    and not msg.get("content")
+                    and not msg.get("tool_calls")
+                )
             ]
 
             # If disabled, remove reasoning from all prior messages
             if not core.config.get("model", "keep_reasoning_in_context"):
-                messages = [{k: v for k, v in m.items() if k != "reasoning_content"} for m in messages]
+                messages = [
+                    {k: v for k, v in m.items() if k != "reasoning_content"} for m in messages
+                ]
 
             if core.config.get("model", "only_preserve_reasoning_for_current_agentic_loop"):
                 # TODO: i really need to make a more user friendly UI for core settings, that matches the UX of module/channel settings...
@@ -88,7 +107,8 @@ class Context:
                 loop_idx = self.channel.agentic_loop_start
                 messages[:loop_idx] = [
                     {k: v for k, v in m.items() if k != "reasoning_content"}
-                    if "tool_calls" in m else m
+                    if "tool_calls" in m
+                    else m
                     for m in messages[:loop_idx]
                 ]
 
@@ -108,7 +128,8 @@ class Context:
                     if isinstance(content, list):
                         # Keep only the text parts of the message
                         text_parts = [
-                            part for part in content
+                            part
+                            for part in content
                             if isinstance(part, dict) and part.get("type") == "text"
                         ]
                         # If stripping leaves nothing, convert to a placeholder string
@@ -120,7 +141,6 @@ class Context:
                     elif isinstance(content, str):
                         pass
                     # Non-string, non-list content is left as-is (don't silently drop messages)
-
 
         end_msg = []
         if end_prompt:
@@ -145,7 +165,15 @@ class Context:
         # we cant just remove only the _metadata field because old chat history used to use metadata fields
         # straight on the message object itself without containing it into a _metadata array,
         # so we need to be aggressive here
-        approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
+        approved_keys = [
+            "role",
+            "content",
+            "reasoning_content",
+            "tool_calls",
+            "tool_call_id",
+            "function_call",
+            "tool",
+        ]
         messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
 
         # enforce correct turn order
@@ -163,13 +191,11 @@ class Context:
                     if last_role == "assistant" and current_role == "assistant":
                         enforced_messages.append({"role": "user", "content": " "})
                     # user -> user: insert assistant spacer
-                    elif last_role == "user" and current_role == "user":
-                        enforced_messages.append({"role": "assistant", "content": " "})
-                    # tool -> user: insert assistant spacer (tool result without assistant response)
-                    elif last_role == "tool" and current_role == "user":
-                        enforced_messages.append({"role": "assistant", "content": " "})
-                    # user -> tool: insert assistant spacer (tool call without tool result)
-                    elif last_role == "user" and current_role == "tool":
+                    elif (
+                        (last_role == "user" and current_role == "user")
+                        or (last_role == "tool" and current_role == "user")
+                        or (last_role == "user" and current_role == "tool")
+                    ):
                         enforced_messages.append({"role": "assistant", "content": " "})
 
                 enforced_messages.append(msg)
@@ -186,13 +212,13 @@ class Context:
 
         # then combine it all
         full_context = system_msg + messages + end_msg
-        
+
         # Calculate current token count (includes tools + context)
         current_tokens = await self.count_tokens(full_context) + tool_tokens
 
         # Leave a small buffer (5%) to avoid hitting exact limit
         effective_max_tokens = int(max_tokens * 0.95)
-        
+
         # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
@@ -201,10 +227,10 @@ class Context:
             reserved_tokens = 0
             if messages and messages[-1].get("role") == "user":
                 reserved_tokens = await self.count_tokens([messages[-1]])
-            
+
             # Reduce the effective max by the reserved amount
             effective_max_with_reserve = effective_max_tokens - reserved_tokens
-            
+
             # Binary search: find the minimum number of messages to remove from the front
             lo, hi = 0, len(messages)
             best_trim = len(messages)  # worst case: remove everything
@@ -248,15 +274,17 @@ class Context:
         message_history = await self.get(system_prompt=False, end_prompt=False, history=True)
         sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
         histend = await self.get(system_prompt=False, end_prompt=True, history=False)
-        
+
         # now we count the tokens for each part of the context
         sysprompt_size_tokens = await self.count_tokens(sysprompt)
         sysprompt_size_words = len(str(sysprompt).split())
-        
+
         message_hist_size_tokens = await self.count_tokens(message_history)
         message_hist_size_words = len(str(message_history).split())
-        
-        histend_size_tokens = await self.count_tokens(await self.get(system_prompt=False, end_prompt=True, history=False))
+
+        histend_size_tokens = await self.count_tokens(
+            await self.get(system_prompt=False, end_prompt=True, history=False)
+        )
         histend_size_words = len(str(histend).split()) if histend else 0
 
         tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
@@ -265,7 +293,12 @@ class Context:
         # get amount of tools active
         tools_amount = len(self.channel.manager.tools)
 
-        combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
+        combined_size_words = (
+            tool_array_size_words
+            + sysprompt_size_words
+            + message_hist_size_words
+            + histend_size_words
+        )
 
         token_usage = await self.get_total_tokens()
 
@@ -282,7 +315,7 @@ class Context:
 
         if not text:
             return 0
-        
+
         # 1 token is roughly 4 characters for most English text
         return len(text) // 4
 
@@ -319,12 +352,19 @@ class Context:
                 # and we auto remove all previous multimodal content from context when passing to the API,
                 # sending only the current message's multimodal content (such as an image)
 
-                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content, 
+                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content,
                 # then i asked my local AI for a more compact and performance friendly way to do it.
                 # now that's a good way to use AI coding, imho :)
                 # thanks Qwen3.6-35B!
                 cleaned_messages = [
-                    {**msg, "content": [item for item in (msg.get("content") or []) if item.get("type") == "text"]}
+                    {
+                        **msg,
+                        "content": [
+                            item
+                            for item in (msg.get("content") or [])
+                            if item.get("type") == "text"
+                        ],
+                    }
                     if isinstance(msg.get("content"), list)
                     else msg
                     for msg in data
