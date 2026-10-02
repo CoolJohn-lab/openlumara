@@ -54,7 +54,7 @@ Modules can expose Python functions as "tools" that the AI can call.
 Modules can react to events happening within the system:
 - **`on_ready()`**: Triggered once when the module is successfully loaded. Use this instead of `__init__()` for async initialization.
 - **`on_shutdown()`**: Triggered when the module is shut down or reloaded (e.g., when config settings are changed).
-- **`on_background()`**: Runs a continuous background task (e.g., a scheduler or monitor). The framework checks if the method is an empty coroutine (only `pass`, `...`, or docstrings) — if so, it won't be started as a background task.
+- **`on_background()`**: Runs a continuous background task (e.g., a scheduler or monitor). The framework checks if the method is an empty coroutine (only `pass`, `...`, or docstrings) - if so, it won't be started as a background task.
 - **`on_user_message(content)`**: Triggered whenever the user sends a message.
 - **`on_assistant_message(content)`**: Triggered whenever the AI sends a response.
 - **`on_install()`**: Triggered when the auto-installer installs the module's dependencies.

@@ -1,6 +1,6 @@
-# Making the Interface Work for You 🌟
+# Making the Interface Work for You 
 
-The OpenLumara interface is designed to be "smart"—it tries to predict what you want so you can stay focused on your chat.
+The OpenLumara interface is designed to be "smart"-it tries to predict what you want so you can stay focused on your chat.
 
 ## Smart Scrolling
 One of the most helpful features is **Smart Scrolling**. 

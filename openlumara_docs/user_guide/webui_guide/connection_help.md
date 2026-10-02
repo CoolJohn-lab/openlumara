@@ -1,12 +1,12 @@
-# Staying Connected 📡
+# Staying Connected 
 
 To work its magic, Lumara needs to stay connected to the server. We've made it very easy for you to know exactly what's happening with your connection.
 
 ## Understanding the Status Dots
 Look for the small colored dots in your interface:
-- **🟢 Green**: Everything is perfect! You are connected to the server and the AI is ready to chat.
-- **🟡 Yellow/Orange**: There might be a small issue, like your API key needing attention. Lumara will usually show a message to help you fix it.
-- **🔴 Red**: The connection is lost. This usually means your internet is down or the server is temporarily unavailable.
+- ** Green**: Everything is perfect! You are connected to the server and the AI is ready to chat.
+- ** Yellow/Orange**: There might be a small issue, like your API key needing attention. Lumara will usually show a message to help you fix it.
+- ** Red**: The connection is lost. This usually means your internet is down or the server is temporarily unavailable.
 
 ## What to do if things go wrong
 If you see a red dot or a "Disconnected" message:

@@ -40,7 +40,7 @@ The `ToolcallManager` is responsible for processing tool calls from the AI's res
 ### Display
 | Method | Description |
 | :--- | :--- |
-| `display_call(tool_data)` | Formats a tool call into a user-friendly string: `🔧 func_name(arg1="val1", arg2="val2")`. Truncates values longer than 30 chars. Handles both dict and object tool data formats. |
+| `display_call(tool_data)` | Formats a tool call into a user-friendly string: ` func_name(arg1="val1", arg2="val2")`. Truncates values longer than 30 chars. Handles both dict and object tool data formats. |
 
 ### Repair
 | Method | Description |

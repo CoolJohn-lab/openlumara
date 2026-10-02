@@ -1,4 +1,4 @@
-# Navigating the Sidebar 🧭
+# Navigating the Sidebar 
 
 The sidebar is your command center. It holds your chat history, your categories, and your settings.
 

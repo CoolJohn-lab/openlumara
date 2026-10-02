@@ -15,11 +15,11 @@ When the application starts, the `Manager` performs several critical tasks:
 - **Channel Loading**: Identifies and instantiates all enabled channels from the `channels/` and `user_channels/` directories.
 - **Module Loading**: Loads both core modules and user-defined modules from the `modules/` and `user_modules/` directories.
 - **Auto-Installer**: Installs/uninstalls Python dependencies for enabled/disabled modules and channels (unless `--disable-auto-installer` is passed).
-- **API Connection**: Attempts to establish a connection to the configured AI provider (non-fatal — continues in disconnected mode on failure).
+- **API Connection**: Attempts to establish a connection to the configured AI provider (non-fatal - continues in disconnected mode on failure).
 
 ### 2. Execution Modes
 The `Manager` supports special execution modes via command-line arguments:
-- **Pure Mode** (`--pure`): Disables all modules. No tools, no AI logic — just the channel.
+- **Pure Mode** (`--pure`): Disables all modules. No tools, no AI logic - just the channel.
 - **Coder Mode** (`--coder`): Loads only the `coder` module, disabling all others.
 
 ### 3. Lifecycle Management
@@ -160,7 +160,7 @@ The `Manager` exposes a global instance via `core.manager.global_instance`, allo
 
 ## Internal Workflow (Startup)
 
-1.  `Manager.__init__(cmdline_args)` is called — creates API client, initializes dicts
+1.  `Manager.__init__(cmdline_args)` is called - creates API client, initializes dicts
 2.  `Manager.run()` is invoked
 3.  Loads enabled channels from config, installs dependencies, instantiates each channel, calls `init()` and `on_ready()`
 4.  Loads enabled user channels (same process)

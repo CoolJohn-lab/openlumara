@@ -1,4 +1,4 @@
-# Welcome to OpenLumara! 🌟
+# Welcome to OpenLumara! 
 
 Think of OpenLumara as your very own personal AI assistant. To make it work its magic, it uses a few different parts working together:
 

@@ -26,7 +26,7 @@ The `Context` ensures that the prompt sent to the AI follows a strict and logica
 To prevent exceeding the AI model's context window, the `Context` performs several optimization and trimming tasks:
 - **Token Counting**: Calculates token usage using character-based estimation (~4 chars per token). Note: The old tiktoken-based counting has been replaced with a simpler character division method.
 - **Binary Search Trimming**: If the prompt is too large, it uses **binary search** to efficiently find the minimum number of messages to remove from the front until the prompt fits within the allowed limit (with a 5% safety buffer).
-- **Max Messages Limit**: Before token trimming, applies a `max_messages` limit (default 200) to history — keeps the most recent N messages.
+- **Max Messages Limit**: Before token trimming, applies a `max_messages` limit (default 200) to history - keeps the most recent N messages.
 - **Multimodal Optimization**: To save tokens, it strips non-text content (like images) from all messages in the history except for the most recent one. Stripped multimedia is replaced with `"[multimedia content]"`.
 
 ### 3. Role and Turn Management

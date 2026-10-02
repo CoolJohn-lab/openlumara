@@ -1,4 +1,4 @@
-# Understanding Your Conversations 💬
+# Understanding Your Conversations 
 
 When chatting with Lumara, you might see more than just plain text. We've added special features to help you understand how the AI is working.
 
@@ -8,7 +8,7 @@ Sometimes, Lumara needs to "think" before it speaks. You might see a section lab
 - You can click these blocks to expand them if you want to see the full details, or collapse them to keep your chat looking clean.
 
 ## Tool Calls & Actions
-Lumara can do more than just talk—it can use "tools" (like checking a schedule or running a command).
+Lumara can do more than just talk-it can use "tools" (like checking a schedule or running a command).
 - When Lumara uses a tool, you'll see a special **Tool Card**.
 - These cards show you what tool is being used and what the result was.
 - They are interactive! You can click on them to see the technical details (arguments) or hide them if they are taking up too much space.

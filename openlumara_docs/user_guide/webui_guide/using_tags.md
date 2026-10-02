@@ -1,4 +1,4 @@
-# Using Tags to Stay Organized 🏷️
+# Using Tags to Stay Organized 
 
 Tags are like little digital sticky notes that you can attach to your chats. They make finding specific topics incredibly easy.
 

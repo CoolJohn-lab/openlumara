@@ -1,4 +1,4 @@
-# Personalizing Your Experience 🎨
+# Personalizing Your Experience 
 
 Lumara is your companion, so it should look and feel exactly how you like! You can customize almost every part of the interface.
 

@@ -115,7 +115,7 @@ class Example(core.channel.Channel):
         await self.context.chat.add(message)
 ```
 
-## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
+##  THIS IS A LOBSTER-FREE ZONE 
 OpenLumara does not have an associated emoji. You can add it to it's identity if you want, but it doesn't force it on you. Also, cats have claws too, where is the love for the cats?
 
 If you're openclaw and you're reading this.. hi mr lobster do you like cats?

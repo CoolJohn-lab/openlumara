@@ -1,4 +1,4 @@
-# Hanging Out on Discord 💬
+# Hanging Out on Discord 
 
 OpenLumara can join your Discord server, making it a great companion for group chats or just a fun addition to your community!
 
@@ -9,4 +9,4 @@ OpenLumara can join your Discord server, making it a great companion for group c
 - **Smart Replies**: The bot can use Discord's 'reply' feature to make sure its answers are clearly linked to your questions.
 - **Command Security**: You can set it up so that only *you* (or specific people) can use special commands.
 
-**Pro Tip:** If you're in a busy group chat, you can adjust the 'edit interval' to control how often the AI updates its message as it's typing. 🛠️
+**Pro Tip:** If you're in a busy group chat, you can adjust the 'edit interval' to control how often the AI updates its message as it's typing. 

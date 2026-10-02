@@ -1,4 +1,4 @@
-# Keyboard Shortcuts ⌨️
+# Keyboard Shortcuts 
 
 If you want to work like a pro, use these keyboard shortcuts to navigate and chat much faster!
 

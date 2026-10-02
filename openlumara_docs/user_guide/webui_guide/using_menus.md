@@ -1,4 +1,4 @@
-# Using Menus & Pop-ups 🖱️
+# Using Menus & Pop-ups 
 
 Sometimes, Lumara will show you a pop-up window (a "modal") to ask for your input or show you settings.
 

@@ -1,4 +1,4 @@
-# Organizing Your Chats 📂
+# Organizing Your Chats 
 
 With many conversations happening, keeping things organized is key to a great experience.
 
@@ -15,4 +15,4 @@ Instead of one giant list, Lumara groups chats into categories.
 - **Custom Categories**: You can move chats into different categories to keep your workspace tidy.
 
 ## Fast Loading
-Don't worry about having hundreds of chats—the interface is built to be lightning-fast. Lumara only "loads" the chats that are actually visible on your screen, so the app stays smooth and responsive no matter how much history you build up.
+Don't worry about having hundreds of chats-the interface is built to be lightning-fast. Lumara only "loads" the chats that are actually visible on your screen, so the app stays smooth and responsive no matter how much history you build up.
